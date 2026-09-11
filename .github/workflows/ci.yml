@@ -84,9 +84,7 @@ jobs:
     # (Settings -> Secrets and variables -> Actions) with a dedicated *test*
     # Supabase project's values. Also skipped for PRs from forks, which never
     # receive repo secrets.
-    if: >-
-      ${{ secrets.E2E_SUPABASE_URL != '' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ secrets.E2E_SUPABASE_URL != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     env:
       APP_URL: http://localhost:3000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
