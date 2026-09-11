@@ -71,6 +71,20 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/ipo_proof_ci
 
+  # Job-level `if:` conditions can't reference the `secrets` context directly
+  # (GitHub Actions rejects the whole workflow file if they do -- confirmed
+  # via this repo's first CI run: "Unrecognized named-value: 'secrets'").
+  # This job checks the one secret that matters inside a step (where
+  # `secrets` IS allowed) and exposes it as a plain job output instead.
+  check-e2e-secrets:
+    name: Check for E2E Supabase secrets
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        run: echo "configured=${{ secrets.E2E_SUPABASE_URL != '' }}" >> "$GITHUB_OUTPUT"
+
   # Drives real S01-S05 flows (signup/login/project CRUD) against a live
   # Supabase project via Playwright -- see apps/web/playwright.config.ts.
   # Requires repo secrets pointing at a dedicated *test* Supabase project
@@ -79,12 +93,13 @@ jobs:
   # when those secrets aren't configured yet, e.g. on forks.
   e2e:
     name: Playwright E2E (S01-S05)
+    needs: check-e2e-secrets
     runs-on: ubuntu-latest
     # Skips cleanly until the E2E_* repo secrets below are configured
     # (Settings -> Secrets and variables -> Actions) with a dedicated *test*
     # Supabase project's values. Also skipped for PRs from forks, which never
     # receive repo secrets.
-    if: ${{ secrets.E2E_SUPABASE_URL != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ needs.check-e2e-secrets.outputs.configured == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     env:
       APP_URL: http://localhost:3000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
