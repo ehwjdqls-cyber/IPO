@@ -8,7 +8,8 @@
     "lint": "echo \"no lint config yet\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "migrate:test": "echo \"wired up in Milestone 1 Task 15 (CI) against a real ephemeral Postgres\""
+    "migrate": "tsx src/migrate-cli.ts",
+    "migrate:test": "tsx src/migrate-cli.ts"
   },
   "dependencies": {
     "pg": "^8"
@@ -17,6 +18,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^22.20.2",
     "@types/pg": "^8.23.1",
+    "tsx": "^4",
     "typescript": "^5",
     "vitest": "^5.0.0"
   }

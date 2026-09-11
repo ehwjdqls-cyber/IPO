@@ -45,6 +45,7 @@ Milestone was built in, so `tests/rls.integration.test.ts` runs against
 WASM, not a mock. `withScope()` in the harness mirrors the production
 `pg.Pool`-based `withScope()` in `src/client.ts` exactly (same
 `set local role` + GUC pattern), so the RLS policies under test are the same
-SQL running the same way. CI (Milestone 1 Task 15) additionally runs
-migrations against a real `pgvector/pgvector:pg17-trixie` container once
-Docker is available there.
+SQL running the same way. CI (`.github/workflows/ci.yml`) additionally runs
+`pnpm db:migrate:test` (`src/migrate-cli.ts`) against a real
+`pgvector/pgvector:pg17-trixie` service container, to catch anything pglite's
+WASM build might not reproduce exactly.

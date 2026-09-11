@@ -4,7 +4,10 @@ import { runMigrations } from "../src/migrate";
 
 export async function createTestDb(): Promise<PGlite> {
   const db = await PGlite.create({ extensions: { pgcrypto } });
-  await runMigrations({ exec: (sql: string) => db.exec(sql) });
+  await runMigrations({
+    exec: (sql: string) => db.exec(sql),
+    query: (sql: string, params?: unknown[]) => db.query(sql, params as never[] | undefined),
+  });
   return db;
 }
 

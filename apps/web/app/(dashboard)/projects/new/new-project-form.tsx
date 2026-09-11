@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useState, type ReactElement, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 type Market = "KOSPI" | "KOSDAQ" | "KONEX" | "UNDECIDED";
@@ -89,27 +89,27 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
         <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           {step === "basic" && (
             <div className="space-y-4">
-              <Field label="프로젝트명">
+              <Field id="name" label="프로젝트명">
                 <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
               </Field>
-              <Field label="회사명">
+              <Field id="companyNameKo" label="회사명">
                 <input
                   value={companyNameKo}
                   onChange={(e) => setCompanyNameKo(e.target.value)}
                   className={inputClass}
                 />
               </Field>
-              <Field label="영문명 (선택)">
+              <Field id="companyNameEn" label="영문명 (선택)">
                 <input
                   value={companyNameEn}
                   onChange={(e) => setCompanyNameEn(e.target.value)}
                   className={inputClass}
                 />
               </Field>
-              <Field label="업종">
+              <Field id="industry" label="업종">
                 <input value={industry} onChange={(e) => setIndustry(e.target.value)} className={inputClass} />
               </Field>
-              <Field label="홈페이지 (선택)">
+              <Field id="websiteUrl" label="홈페이지 (선택)">
                 <input
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
@@ -125,7 +125,7 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
 
           {step === "listing" && (
             <div className="space-y-4">
-              <Field label="목표시장">
+              <Field id="targetMarket" label="목표시장">
                 <select
                   value={targetMarket}
                   onChange={(e) => setTargetMarket(e.target.value as Market)}
@@ -137,7 +137,7 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
                   <option value="KONEX">KONEX</option>
                 </select>
               </Field>
-              <Field label="목표 청구일 (선택)">
+              <Field id="targetFilingDate" label="목표 청구일 (선택)">
                 <input
                   type="date"
                   value={targetFilingDate}
@@ -145,7 +145,7 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
                   className={inputClass}
                 />
               </Field>
-              <Field label="주관사 (선택)">
+              <Field id="leadUnderwriter" label="주관사 (선택)">
                 <input
                   value={leadUnderwriter}
                   onChange={(e) => setLeadUnderwriter(e.target.value)}
@@ -176,7 +176,7 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
                   </label>
                 ))}
               </div>
-              <Field label="기본 질문 수">
+              <Field id="questionCount" label="기본 질문 수">
                 <select
                   value={questionCount}
                   onChange={(e) => setQuestionCount(Number(e.target.value))}
@@ -231,11 +231,13 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ id, label, children }: { id: string; label: string; children: ReactElement<{ id?: string }> }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</label>
-      {children}
+      <label htmlFor={id} className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        {label}
+      </label>
+      {isValidElement(children) ? cloneElement(children, { id }) : children}
     </div>
   );
 }

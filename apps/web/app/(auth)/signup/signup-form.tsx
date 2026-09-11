@@ -81,8 +81,11 @@ export function SignupForm() {
         {step === "account" && (
           <form onSubmit={handleAccountSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">이름</label>
+              <label htmlFor="displayName" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                이름
+              </label>
               <input
+                id="displayName"
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -90,8 +93,11 @@ export function SignupForm() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">업무 이메일</label>
+              <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                업무 이메일
+              </label>
               <input
+                id="email"
                 type="email"
                 required
                 value={email}
@@ -100,8 +106,11 @@ export function SignupForm() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">비밀번호</label>
+              <label htmlFor="password" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                비밀번호
+              </label>
               <input
+                id="password"
                 type="password"
                 required
                 minLength={8}
@@ -110,8 +119,13 @@ export function SignupForm() {
                 className={inputClass}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+            <label htmlFor="agreed" className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+              <input
+                id="agreed"
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
               이용약관 및 개인정보처리방침에 동의합니다.
             </label>
             {error && <p className="text-sm text-red-600">{error}</p>}
@@ -128,8 +142,16 @@ export function SignupForm() {
         {step === "organization" && (
           <form onSubmit={handleOrganizationSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">조직명</label>
-              <input required value={orgName} onChange={(e) => setOrgName(e.target.value)} className={inputClass} />
+              <label htmlFor="orgName" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                조직명
+              </label>
+              <input
+                id="orgName"
+                required
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                className={inputClass}
+              />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button

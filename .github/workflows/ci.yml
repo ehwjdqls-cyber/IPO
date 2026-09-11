@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: "12.3.4"
+  NODE_VERSION: "22"
+
+jobs:
+  lint-typecheck-test-build:
+    name: Lint, typecheck, unit test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r lint
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm -r build
+
+  db-migrate:
+    name: Apply migrations to a real Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17-trixie
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ipo_proof_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm db:migrate:test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/ipo_proof_ci
+
+  # Drives real S01-S05 flows (signup/login/project CRUD) against a live
+  # Supabase project via Playwright -- see apps/web/playwright.config.ts.
+  # Requires repo secrets pointing at a dedicated *test* Supabase project
+  # (with Auth's "Confirm email" disabled, since nothing here can click an
+  # email confirmation link) and a reachable Postgres for it. Skips cleanly
+  # when those secrets aren't configured yet, e.g. on forks.
+  e2e:
+    name: Playwright E2E (S01-S05)
+    runs-on: ubuntu-latest
+    # Skips cleanly until the E2E_* repo secrets below are configured
+    # (Settings -> Secrets and variables -> Actions) with a dedicated *test*
+    # Supabase project's values. Also skipped for PRs from forks, which never
+    # receive repo secrets.
+    if: >-
+      ${{ secrets.E2E_SUPABASE_URL != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    env:
+      APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+      AUTH_SECRET: ${{ secrets.E2E_AUTH_SECRET }}
+      SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      # Milestone 2+ env vars are unused by S01-S05 but still required by
+      # packages/contracts' zod schema for the app to boot -- dummy values
+      # are fine here, this job never touches storage/queue/AI.
+      OBJECT_STORAGE_ENDPOINT: https://storage.invalid
+      OBJECT_STORAGE_REGION: unused
+      OBJECT_STORAGE_BUCKET: unused
+      OBJECT_STORAGE_ACCESS_KEY_ID: unused
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: unused
+      OBJECT_STORAGE_KMS_KEY_ID: unused
+      UPSTASH_REDIS_REST_URL: https://redis.invalid
+      UPSTASH_REDIS_REST_TOKEN: unused
+      QSTASH_TOKEN: unused
+      QSTASH_CURRENT_SIGNING_KEY: unused
+      QSTASH_NEXT_SIGNING_KEY: unused
+      AI_API_KEY: unused
+      AI_GENERATION_MODEL_SNAPSHOT: unused
+      AI_EMBEDDING_MODEL_SNAPSHOT: unused
+      SENTRY_DSN: https://sentry.invalid/1
+      AUDIT_HASH_PEPPER: unused-unused-unused-unused-unused
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to the test Supabase project
+        run: pnpm db:migrate:test
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm --filter web build
+
+      - run: pnpm --filter web test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
