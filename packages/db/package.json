@@ -7,15 +7,17 @@
   "scripts": {
     "lint": "echo \"no lint config yet\"",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no unit tests yet\"",
-    "migrate:test": "echo \"migration runner not implemented yet\""
+    "test": "vitest run",
+    "migrate:test": "echo \"wired up in Milestone 1 Task 15 (CI) against a real ephemeral Postgres\""
   },
   "dependencies": {
     "pg": "^8"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^22.20.2",
-    "node-pg-migrate": "^9",
-    "typescript": "^5"
+    "@types/pg": "^8.23.1",
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   }
 }
