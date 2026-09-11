@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IPO Proof
 
-## Getting Started
+근거 기반 IPO 상장심사 Q&A 및 증빙 매핑 코파일럿. 제품 요구사항과 구현 계약의 단일 기준은
+[`IPO_PROOF_WEBAPP_MASTER_SPEC.md`](./IPO_PROOF_WEBAPP_MASTER_SPEC.md)이다.
 
-First, run the development server:
+## 저장소 구조 (pnpm workspace monorepo)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+apps/web/                    # Next.js App Router UI + /api/v1 Route Handlers
+packages/db/                 # SQL 마이그레이션, DB 클라이언트, RLS/RBAC 테스트
+packages/contracts/          # Zod 스키마 (env, RBAC, API DTO)
+packages/ai/                 # AI provider adapter, RAG (Milestone 3부터 구현)
+packages/ui/                 # 공통 디자인 토큰/컴포넌트
+workers/document-worker/     # Python 추출 worker (Milestone 2부터 구현)
+fixtures/synthetic/          # 합성·비식별 테스트 문서만 저장 (실제 고객 문서 금지)
+tests/e2e/                   # Playwright E2E
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 시작하기
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+cp .env.example .env.local   # 값을 채운 뒤 사용
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 검증 명령
 
-## Learn More
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 보안 원칙
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 다른 조직(organization)의 데이터는 어떤 API에서도 노출되지 않는다.
+- 모든 테넌트 데이터 접근에는 `organization_id`(프로젝트 데이터는 `project_id`까지) 범위가 적용된다.
+- service role key 등 secret은 서버 전용이며 브라우저 번들에 포함되지 않는다.
+- 실제 고객 문서·개인정보는 테스트 fixture나 Git에 저장하지 않는다.

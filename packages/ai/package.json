@@ -1,0 +1,12 @@
+{
+  "name": "@ipo/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "lint": "echo \"no lint config yet\"",
+    "typecheck": "echo \"stub package - Milestone 3\"",
+    "test": "echo \"stub package - Milestone 3\""
+  }
+}
