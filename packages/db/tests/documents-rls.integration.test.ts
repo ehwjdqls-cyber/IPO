@@ -1,0 +1,204 @@
+import { randomUUID } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { PGlite } from "@electric-sql/pglite";
+import { asOwner, createTestDb, withScope } from "./pglite-harness";
+
+let db: PGlite;
+
+beforeEach(async () => {
+  db = await createTestDb();
+});
+
+afterEach(async () => {
+  await db.close();
+});
+
+async function seedOrgWithMemberAndProject(
+  displayName: string,
+  role: "OWNER" | "ADMIN" | "EDITOR" | "REVIEWER" | "VIEWER"
+) {
+  const userId = randomUUID();
+  const { orgId, projectId } = await asOwner(db, async (tx) => {
+    const orgRes = await tx.query<{ id: string }>(
+      "insert into organizations (name) values ($1) returning id",
+      [`${displayName}-org-${randomUUID()}`]
+    );
+    const id = orgRes.rows[0]!.id;
+    await tx.query("insert into profiles (id, display_name) values ($1, $2)", [
+      userId,
+      displayName,
+    ]);
+    await tx.query(
+      "insert into organization_members (organization_id, user_id, role, status) values ($1, $2, $3, 'ACTIVE')",
+      [id, userId, role]
+    );
+    const projectRes = await tx.query<{ id: string }>(
+      `insert into projects (organization_id, name, company_name_ko, industry, created_by)
+       values ($1, $2, $3, $4, $5) returning id`,
+      [id, `${displayName}-project`, "테스트社", "B2B SaaS", userId]
+    );
+    return { orgId: id, projectId: projectRes.rows[0]!.id };
+  });
+  return { orgId, projectId, userId };
+}
+
+async function insertDocumentAsOwner(orgId: string, projectId: string, uploadedBy: string) {
+  const res = await asOwner(db, (tx) =>
+    tx.query<{ id: string }>(
+      `insert into documents
+         (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, uploaded_by)
+       values ($1, $2, '감사보고서.pdf', $3, 'application/pdf', 1024, $4, $5)
+       returning id`,
+      [
+        orgId,
+        projectId,
+        `${orgId}/${projectId}/${randomUUID()}`,
+        "a".repeat(64),
+        uploadedBy,
+      ]
+    )
+  );
+  return res.rows[0]!.id;
+}
+
+async function insertPageAsOwner(documentId: string) {
+  const res = await asOwner(db, (tx) =>
+    tx.query<{ id: string }>(
+      `insert into document_pages (document_id, page_number, extracted_text) values ($1, 1, '본문') returning id`,
+      [documentId]
+    )
+  );
+  return res.rows[0]!.id;
+}
+
+async function insertChunkAsOwner(
+  orgId: string,
+  projectId: string,
+  documentId: string,
+  pageId: string
+) {
+  const res = await asOwner(db, (tx) =>
+    tx.query<{ id: string }>(
+      `insert into document_chunks
+         (organization_id, project_id, document_id, page_id, chunk_index, content, content_sha256, token_count)
+       values ($1, $2, $3, $4, 0, '청크 내용', $5, 10)
+       returning id`,
+      [orgId, projectId, documentId, pageId, "b".repeat(64)]
+    )
+  );
+  return res.rows[0]!.id;
+}
+
+describe("tenant isolation (documents)", () => {
+  it("다른 조직 멤버는 documents row를 조회할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("owner-b", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+
+    const rows = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from documents where id = $1", [documentId])
+    );
+
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it("같은 조직의 ACTIVE 멤버는 documents row를 조회할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+
+    const rows = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from documents where id = $1", [documentId])
+    );
+
+    expect(rows.rows).toHaveLength(1);
+  });
+
+  it("VIEWER role은 documents INSERT가 거부된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("viewer-a", "VIEWER");
+
+    await expect(
+      withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+        tx.query(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, uploaded_by)
+           values ($1, $2, 'x.pdf', $3, 'application/pdf', 10, $4, $5)`,
+          [orgA.orgId, orgA.projectId, randomUUID(), "c".repeat(64), orgA.userId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+
+  it("EDITOR role은 documents INSERT가 허용된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("editor-a", "EDITOR");
+
+    const result = await withScope(
+      db,
+      { userId: orgA.userId, organizationId: orgA.orgId },
+      (tx) =>
+        tx.query(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, uploaded_by)
+           values ($1, $2, 'x.pdf', $3, 'application/pdf', 10, $4, $5) returning id`,
+          [orgA.orgId, orgA.projectId, randomUUID(), "d".repeat(64), orgA.userId]
+        )
+    );
+
+    expect(result.rows).toHaveLength(1);
+  });
+});
+
+describe("tenant isolation (document_pages)", () => {
+  it("다른 조직 멤버는 document_pages row를 조회할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("owner-b", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+
+    const rows = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from document_pages where id = $1", [pageId])
+    );
+
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it("같은 조직 멤버는 document_pages row를 조회할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+
+    const rows = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from document_pages where id = $1", [pageId])
+    );
+
+    expect(rows.rows).toHaveLength(1);
+  });
+});
+
+describe("tenant isolation (document_chunks)", () => {
+  it("다른 조직 멤버는 document_chunks row를 조회할 수 없다 (retrieval 오염 방지 핵심 불변조건)", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("owner-b", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+    const chunkId = await insertChunkAsOwner(orgA.orgId, orgA.projectId, documentId, pageId);
+
+    const rows = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from document_chunks where id = $1", [chunkId])
+    );
+
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it("같은 조직 멤버는 document_chunks row를 조회할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+    const chunkId = await insertChunkAsOwner(orgA.orgId, orgA.projectId, documentId, pageId);
+
+    const rows = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from document_chunks where id = $1", [chunkId])
+    );
+
+    expect(rows.rows).toHaveLength(1);
+  });
+});

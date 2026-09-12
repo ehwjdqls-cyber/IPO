@@ -1,9 +1,10 @@
 import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { runMigrations } from "../src/migrate";
 
 export async function createTestDb(): Promise<PGlite> {
-  const db = await PGlite.create({ extensions: { pgcrypto } });
+  const db = await PGlite.create({ extensions: { pgcrypto, vector } });
   await runMigrations({
     exec: (sql: string) => db.exec(sql),
     query: (sql: string, params?: unknown[]) => db.query(sql, params as never[] | undefined),
