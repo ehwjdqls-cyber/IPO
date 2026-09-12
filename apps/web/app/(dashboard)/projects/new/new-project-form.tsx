@@ -1,7 +1,19 @@
 "use client";
 
-import { cloneElement, isValidElement, useState, type ReactElement, type ReactNode } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "../../../../components/ui/button";
+import { Card, CardContent } from "../../../../components/ui/card";
+import { Checkbox } from "../../../../components/ui/checkbox";
+import { Input } from "../../../../components/ui/input";
+import { Label } from "../../../../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../../components/ui/select";
 
 type Market = "KOSPI" | "KOSDAQ" | "KONEX" | "UNDECIDED";
 type Step = "basic" | "listing" | "scope" | "confirm";
@@ -22,9 +34,6 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "confirm", label: "4. 확인" },
 ];
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950";
-
 export function NewProjectForm({ organizationId }: { organizationId: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("basic");
@@ -42,7 +51,7 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
   const [leadUnderwriter, setLeadUnderwriter] = useState("");
 
   const [categories, setCategories] = useState<string[]>(CATEGORIES.map((c) => c.code));
-  const [questionCount, setQuestionCount] = useState(20);
+  const [questionCount, setQuestionCount] = useState("20");
 
   function toggleCategory(code: string) {
     setCategories((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
@@ -78,194 +87,174 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
   return (
     <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
       <div className="space-y-6">
-        <ol className="flex gap-4 text-xs font-medium text-zinc-400">
+        <ol className="flex gap-4 text-xs font-medium text-muted-foreground">
           {STEPS.map((s) => (
-            <li key={s.key} className={s.key === step ? "text-zinc-900 dark:text-zinc-50" : ""}>
+            <li key={s.key} className={s.key === step ? "text-foreground" : ""}>
               {s.label}
             </li>
           ))}
         </ol>
 
-        <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          {step === "basic" && (
-            <div className="space-y-4">
-              <Field id="name" label="프로젝트명">
-                <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-              </Field>
-              <Field id="companyNameKo" label="회사명">
-                <input
-                  value={companyNameKo}
-                  onChange={(e) => setCompanyNameKo(e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <Field id="companyNameEn" label="영문명 (선택)">
-                <input
-                  value={companyNameEn}
-                  onChange={(e) => setCompanyNameEn(e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <Field id="industry" label="업종">
-                <input value={industry} onChange={(e) => setIndustry(e.target.value)} className={inputClass} />
-              </Field>
-              <Field id="websiteUrl" label="홈페이지 (선택)">
-                <input
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://"
-                  className={inputClass}
-                />
-              </Field>
-              <StepButton onClick={() => setStep("listing")} disabled={!name || !companyNameKo || !industry}>
-                다음
-              </StepButton>
-            </div>
-          )}
-
-          {step === "listing" && (
-            <div className="space-y-4">
-              <Field id="targetMarket" label="목표시장">
-                <select
-                  value={targetMarket}
-                  onChange={(e) => setTargetMarket(e.target.value as Market)}
-                  className={inputClass}
+        <Card>
+          <CardContent className="space-y-4">
+            {step === "basic" && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">프로젝트명</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="companyNameKo">회사명</Label>
+                  <Input
+                    id="companyNameKo"
+                    value={companyNameKo}
+                    onChange={(e) => setCompanyNameKo(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="companyNameEn">영문명 (선택)</Label>
+                  <Input
+                    id="companyNameEn"
+                    value={companyNameEn}
+                    onChange={(e) => setCompanyNameEn(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="industry">업종</Label>
+                  <Input id="industry" value={industry} onChange={(e) => setIndustry(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="websiteUrl">홈페이지 (선택)</Label>
+                  <Input
+                    id="websiteUrl"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="https://"
+                  />
+                </div>
+                <Button
+                  onClick={() => setStep("listing")}
+                  disabled={!name || !companyNameKo || !industry}
                 >
-                  <option value="UNDECIDED">미정</option>
-                  <option value="KOSPI">KOSPI</option>
-                  <option value="KOSDAQ">KOSDAQ</option>
-                  <option value="KONEX">KONEX</option>
-                </select>
-              </Field>
-              <Field id="targetFilingDate" label="목표 청구일 (선택)">
-                <input
-                  type="date"
-                  value={targetFilingDate}
-                  onChange={(e) => setTargetFilingDate(e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <Field id="leadUnderwriter" label="주관사 (선택)">
-                <input
-                  value={leadUnderwriter}
-                  onChange={(e) => setLeadUnderwriter(e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <div className="flex gap-2">
-                <StepButton variant="ghost" onClick={() => setStep("basic")}>
-                  이전
-                </StepButton>
-                <StepButton onClick={() => setStep("scope")}>다음</StepButton>
+                  다음
+                </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {step === "scope" && (
-            <div className="space-y-4">
-              <p className="text-sm text-zinc-500">질문 생성 단계에서 다시 조정할 수 있습니다.</p>
-              <div className="grid grid-cols-2 gap-2">
-                {CATEGORIES.map((c) => (
-                  <label key={c.code} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                    <input
-                      type="checkbox"
-                      checked={categories.includes(c.code)}
-                      onChange={() => toggleCategory(c.code)}
-                    />
-                    {c.label}
-                  </label>
-                ))}
+            {step === "listing" && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="targetMarket">목표시장</Label>
+                  <Select value={targetMarket} onValueChange={(v) => setTargetMarket(v as Market)}>
+                    <SelectTrigger id="targetMarket" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UNDECIDED">미정</SelectItem>
+                      <SelectItem value="KOSPI">KOSPI</SelectItem>
+                      <SelectItem value="KOSDAQ">KOSDAQ</SelectItem>
+                      <SelectItem value="KONEX">KONEX</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="targetFilingDate">목표 청구일 (선택)</Label>
+                  <Input
+                    id="targetFilingDate"
+                    type="date"
+                    value={targetFilingDate}
+                    onChange={(e) => setTargetFilingDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="leadUnderwriter">주관사 (선택)</Label>
+                  <Input
+                    id="leadUnderwriter"
+                    value={leadUnderwriter}
+                    onChange={(e) => setLeadUnderwriter(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep("basic")}>
+                    이전
+                  </Button>
+                  <Button onClick={() => setStep("scope")}>다음</Button>
+                </div>
               </div>
-              <Field id="questionCount" label="기본 질문 수">
-                <select
-                  value={questionCount}
-                  onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  className={inputClass}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={30}>30</option>
-                </select>
-              </Field>
-              <div className="flex gap-2">
-                <StepButton variant="ghost" onClick={() => setStep("listing")}>
-                  이전
-                </StepButton>
-                <StepButton onClick={() => setStep("confirm")}>다음</StepButton>
-              </div>
-            </div>
-          )}
+            )}
 
-          {step === "confirm" && (
-            <div className="space-y-4">
-              <p className="text-sm text-zinc-500">
-                업로드하는 문서와 생성되는 답변에는 회사의 민감한 재무·영업 정보가 포함될 수 있습니다. 접근 권한이
-                있는 팀원만 이 프로젝트를 조회할 수 있습니다.
-              </p>
-              {error && <p className="text-sm text-red-600">{error}</p>}
-              <div className="flex gap-2">
-                <StepButton variant="ghost" onClick={() => setStep("scope")}>
-                  이전
-                </StepButton>
-                <StepButton onClick={handleCreate} disabled={loading}>
-                  {loading ? "생성 중..." : "프로젝트 생성"}
-                </StepButton>
+            {step === "scope" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">질문 생성 단계에서 다시 조정할 수 있습니다.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {CATEGORIES.map((c) => (
+                    <Label key={c.code} htmlFor={`category-${c.code}`} className="font-normal">
+                      <Checkbox
+                        id={`category-${c.code}`}
+                        checked={categories.includes(c.code)}
+                        onCheckedChange={() => toggleCategory(c.code)}
+                      />
+                      {c.label}
+                    </Label>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="questionCount">기본 질문 수</Label>
+                  <Select value={questionCount} onValueChange={setQuestionCount}>
+                    <SelectTrigger id="questionCount" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep("listing")}>
+                    이전
+                  </Button>
+                  <Button onClick={() => setStep("confirm")}>다음</Button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {step === "confirm" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  업로드하는 문서와 생성되는 답변에는 회사의 민감한 재무·영업 정보가 포함될 수 있습니다. 접근 권한이
+                  있는 팀원만 이 프로젝트를 조회할 수 있습니다.
+                </p>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep("scope")}>
+                    이전
+                  </Button>
+                  <Button onClick={handleCreate} disabled={loading}>
+                    {loading ? "생성 중..." : "프로젝트 생성"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <aside className="h-fit space-y-3 rounded-lg border border-zinc-200 bg-white p-4 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="font-medium text-zinc-900 dark:text-zinc-50">입력 요약</h2>
-        <dl className="space-y-1 text-zinc-500">
-          <SummaryRow label="프로젝트명" value={name} />
-          <SummaryRow label="회사명" value={companyNameKo} />
-          <SummaryRow label="업종" value={industry} />
-          <SummaryRow label="목표시장" value={targetMarket} />
-          <SummaryRow label="목표 청구일" value={targetFilingDate} />
-          <SummaryRow label="질문 수" value={String(questionCount)} />
-        </dl>
-      </aside>
+      <Card className="h-fit">
+        <CardContent className="space-y-3 text-sm">
+          <h2 className="font-medium text-foreground">입력 요약</h2>
+          <dl className="space-y-1 text-muted-foreground">
+            <SummaryRow label="프로젝트명" value={name} />
+            <SummaryRow label="회사명" value={companyNameKo} />
+            <SummaryRow label="업종" value={industry} />
+            <SummaryRow label="목표시장" value={targetMarket} />
+            <SummaryRow label="목표 청구일" value={targetFilingDate} />
+            <SummaryRow label="질문 수" value={questionCount} />
+          </dl>
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-function Field({ id, label, children }: { id: string; label: string; children: ReactElement<{ id?: string }> }) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        {label}
-      </label>
-      {isValidElement(children) ? cloneElement(children, { id }) : children}
-    </div>
-  );
-}
-
-function StepButton({
-  children,
-  onClick,
-  disabled,
-  variant = "primary",
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: "primary" | "ghost";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={
-        variant === "primary"
-          ? "rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900"
-          : "rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-      }
-    >
-      {children}
-    </button>
   );
 }
 
@@ -273,7 +262,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
       <span>{label}</span>
-      <span className="text-right text-zinc-700 dark:text-zinc-300">{value || "-"}</span>
+      <span className="text-right text-foreground">{value || "-"}</span>
     </div>
   );
 }

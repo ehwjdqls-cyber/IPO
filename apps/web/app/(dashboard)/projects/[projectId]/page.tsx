@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getAuthenticatedUser } from "../../../../lib/auth";
 import { findProjectById } from "../../../../lib/queries/projects";
+import { Card, CardContent } from "../../../../components/ui/card";
 
 const MARKET_LABEL: Record<string, string> = {
   KOSPI: "KOSPI",
@@ -28,8 +29,8 @@ export default async function ProjectDashboardPage({
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{project.companyNameKo}</h1>
-        <p className="text-sm text-zinc-500">
+        <h1 className="text-lg font-semibold text-foreground">{project.companyNameKo}</h1>
+        <p className="text-sm text-muted-foreground">
           {MARKET_LABEL[project.targetMarket]} · 목표 청구일 {project.targetFilingDate ?? "미정"}
         </p>
       </div>
@@ -42,14 +43,18 @@ export default async function ProjectDashboardPage({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">다음 행동</h2>
-          <p className="mt-2 text-sm text-zinc-500">문서를 업로드하면 다음 행동이 표시됩니다.</p>
-        </section>
-        <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">최근 활동</h2>
-          <p className="mt-2 text-sm text-zinc-500">아직 활동이 없습니다.</p>
-        </section>
+        <Card>
+          <CardContent>
+            <h2 className="text-sm font-medium text-foreground">다음 행동</h2>
+            <p className="mt-2 text-sm text-muted-foreground">문서를 업로드하면 다음 행동이 표시됩니다.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <h2 className="text-sm font-medium text-foreground">최근 활동</h2>
+            <p className="mt-2 text-sm text-muted-foreground">아직 활동이 없습니다.</p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -57,9 +62,11 @@ export default async function ProjectDashboardPage({
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-xs text-zinc-500">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{value}</p>
-    </div>
+    <Card>
+      <CardContent>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
   );
 }

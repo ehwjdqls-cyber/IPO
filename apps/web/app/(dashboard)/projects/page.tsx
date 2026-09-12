@@ -2,6 +2,16 @@ import Link from "next/link";
 import { getAuthenticatedUser } from "../../../lib/auth";
 import { listMemberships } from "../../../lib/queries/organizations";
 import { listProjects } from "../../../lib/queries/projects";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent } from "../../../components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 
 const MARKET_LABEL: Record<string, string> = {
   KOSPI: "KOSPI",
@@ -22,8 +32,8 @@ export default async function ProjectsPage() {
   if (!organization) {
     return (
       <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">소속된 조직이 없습니다</h1>
-        <p className="mt-2 text-sm text-zinc-500">회원가입을 완료하면 조직이 자동으로 생성됩니다.</p>
+        <h1 className="text-lg font-semibold text-foreground">소속된 조직이 없습니다</h1>
+        <p className="mt-2 text-sm text-muted-foreground">회원가입을 완료하면 조직이 자동으로 생성됩니다.</p>
       </div>
     );
   }
@@ -33,57 +43,57 @@ export default async function ProjectsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">IPO 프로젝트</h1>
-        <Link
-          href="/projects/new"
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-zinc-900"
-        >
-          새 프로젝트
-        </Link>
+        <h1 className="text-lg font-semibold text-foreground">IPO 프로젝트</h1>
+        <Button asChild>
+          <Link href="/projects/new">새 프로젝트</Link>
+        </Button>
       </div>
 
       {projects.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-700 dark:bg-zinc-900">
-          <p className="text-sm text-zinc-500">
-            아직 프로젝트가 없습니다. 데모가 아닌 실제 IPO 프로젝트를 만들어보세요.
-          </p>
-          <Link
-            href="/projects/new"
-            className="mt-4 inline-block rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white dark:bg-zinc-50 dark:text-zinc-900"
-          >
-            새 프로젝트 만들기
-          </Link>
-        </div>
+        <Card className="border-dashed">
+          <CardContent className="p-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              아직 프로젝트가 없습니다. 데모가 아닌 실제 IPO 프로젝트를 만들어보세요.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href="/projects/new">새 프로젝트 만들기</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-            <thead className="bg-zinc-50 text-left text-xs font-medium uppercase text-zinc-500 dark:bg-zinc-950">
-              <tr>
-                <th className="px-4 py-3">회사명</th>
-                <th className="px-4 py-3">시장</th>
-                <th className="px-4 py-3">목표일</th>
-                <th className="px-4 py-3">상태</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>회사명</TableHead>
+                <TableHead>시장</TableHead>
+                <TableHead>목표일</TableHead>
+                <TableHead>상태</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {projects.map((project) => (
-                <tr key={project.id}>
-                  <td className="px-4 py-3">
+                <TableRow key={project.id}>
+                  <TableCell>
                     <Link
                       href={`/projects/${project.id}`}
-                      className="font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                      className="font-medium text-foreground hover:underline"
                     >
                       {project.companyNameKo}
                     </Link>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500">{MARKET_LABEL[project.targetMarket]}</td>
-                  <td className="px-4 py-3 text-zinc-500">{project.targetFilingDate ?? "-"}</td>
-                  <td className="px-4 py-3 text-zinc-500">{project.status}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {MARKET_LABEL[project.targetMarket]}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {project.targetFilingDate ?? "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{project.status}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   );

@@ -10,9 +10,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <header className="border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <Link href="/projects" className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+    <div className="flex min-h-full flex-1 flex-col bg-muted/30">
+      <header className="border-b border-border bg-background px-6 py-4">
+        <Link href="/projects" className="text-sm font-semibold text-foreground">
           IPO Proof
         </Link>
       </header>

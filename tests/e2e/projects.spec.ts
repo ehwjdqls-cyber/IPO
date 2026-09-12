@@ -17,8 +17,9 @@ test("S03→S04→S05: 빈 프로젝트 목록에서 새 프로젝트를 만들�
   await page.getByLabel("업종").fill("B2B SaaS");
   await page.getByRole("button", { name: "다음" }).click();
 
-  // S04: 2. 상장계획
-  await page.getByLabel("목표시장").selectOption("KOSDAQ");
+  // S04: 2. 상장계획 (Radix Select: combobox 열고 옵션 클릭)
+  await page.getByLabel("목표시장").click();
+  await page.getByRole("option", { name: "KOSDAQ" }).click();
   await page.getByRole("button", { name: "다음" }).click();
 
   // S04: 3. 분석범위 (기본값 그대로)
