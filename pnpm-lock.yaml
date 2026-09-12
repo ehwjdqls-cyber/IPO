@@ -203,7 +203,30 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(@types/node@20.19.43)(jsdom@30.0.1)(vite@8.2.2(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
 
-  packages/ai: {}
+  packages/ai:
+    dependencies:
+      '@ipo/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ipo/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
+      '@electric-sql/pglite-pgvector':
+        specifier: ^0.0.9
+        version: 0.0.9(@electric-sql/pglite@0.5.8)
+      '@types/node':
+        specifier: ^22.20.2
+        version: 22.20.2
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.0
+        version: 5.0.0(@types/node@22.20.2)(jsdom@30.0.1)(vite@8.2.2(@types/node@22.20.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
 
   packages/contracts:
     dependencies:
