@@ -36,6 +36,7 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r test
       - run: pnpm -r build
+      - run: pnpm audit --prod
 
   db-migrate:
     name: Apply migrations to a real Postgres
