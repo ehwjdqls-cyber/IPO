@@ -37,6 +37,21 @@ describe("can", () => {
     ["VIEWER", "project.delete", false],
     ["VIEWER", "member.manage", false],
     ["VIEWER", "org.update", false],
+
+    // document.manage covers upload/complete/delete/reprocess -- spec 19절
+    // lists all four at the same EDITOR+ threshold (unlike project.delete,
+    // which needs ADMIN+), so a single action is accurate here.
+    ["OWNER", "document.manage", true],
+    ["ADMIN", "document.manage", true],
+    ["EDITOR", "document.manage", true],
+    ["REVIEWER", "document.manage", false],
+    ["VIEWER", "document.manage", false],
+
+    ["OWNER", "document.read", true],
+    ["ADMIN", "document.read", true],
+    ["EDITOR", "document.read", true],
+    ["REVIEWER", "document.read", true],
+    ["VIEWER", "document.read", true],
   ])("%s가 %s를 수행할 수 있는지 = %s", (role, action, expected) => {
     expect(can(role, action)).toBe(expected);
   });
