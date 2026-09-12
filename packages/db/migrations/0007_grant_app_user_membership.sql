@@ -1,0 +1,18 @@
+-- 0006 created the app_user role but never granted membership in it to
+-- whoever runs migrations, so a later `set local role app_user`
+-- (packages/db/src/client.ts#withScope) fails with "permission denied to
+-- set role" outside of a true Postgres superuser connection.
+--
+-- This was invisible against pglite and a fresh local/CI Postgres
+-- container, where migrations run as the bootstrap superuser: a real
+-- superuser can SET ROLE to any role regardless of membership, and (on
+-- Postgres 16+) is also auto-granted membership in roles it creates. It
+-- surfaced only against a real Supabase project, whose pooled connection
+-- role has broad privileges but is deliberately not a full superuser.
+--
+-- `current_user` (not a literal role name) makes this portable: whichever
+-- role runs this migration -- a local dev role, a CI container's
+-- superuser, or Supabase's pooler role -- ends up able to assume app_user
+-- afterward. Re-granting an existing membership is a no-op, so this is
+-- safe to have run unconditionally.
+grant app_user to current_user;
