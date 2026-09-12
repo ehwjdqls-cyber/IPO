@@ -38,6 +38,64 @@ jobs:
       - run: pnpm -r build
       - run: pnpm audit --prod
 
+  document-worker-tests:
+    name: Python document-worker unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/document-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  # Runs document_worker/malware_scan.py against a REAL clamd, which this
+  # development session has no way to verify (no Docker/ClamAV locally --
+  # confirmed, not assumed). tests/test_malware_scan.py skips everywhere
+  # else; this is the only place it actually executes.
+  document-worker-malware-scan:
+    name: ClamAV EICAR malware-scan verification
+    runs-on: ubuntu-latest
+    services:
+      clamav:
+        image: clamav/clamav:latest
+        ports:
+          - 3310:3310
+    defaults:
+      run:
+        working-directory: workers/document-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Wait for clamd (virus DB load can take a while on cold start)
+        run: |
+          for i in $(seq 1 60); do
+            if (echo > /dev/tcp/127.0.0.1/3310) 2>/dev/null; then
+              echo "clamd is up"
+              exit 0
+            fi
+            echo "waiting for clamd... ($i)"
+            sleep 5
+          done
+          echo "clamd did not become ready in time"
+          exit 1
+
+      - run: python -m pytest -q tests/test_malware_scan.py
+        env:
+          CLAMD_HOST: 127.0.0.1
+          CLAMD_PORT: "3310"
+
   db-migrate:
     name: Apply migrations to a real Postgres
     runs-on: ubuntu-latest
