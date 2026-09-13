@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can } from "@ipo/contracts";
 import { getAuthenticatedUser } from "../../../../../lib/auth";
@@ -109,7 +110,12 @@ export default async function DocumentsPage({
               {documents.map((doc) => (
                 <TableRow key={doc.id}>
                   <TableCell className="font-medium text-foreground">
-                    {doc.originalFilename}
+                    <Link
+                      href={`/projects/${projectId}/documents/${doc.id}`}
+                      className="hover:underline"
+                    >
+                      {doc.originalFilename}
+                    </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {MEDIA_TYPE_LABEL[doc.mediaType] ?? doc.mediaType}
