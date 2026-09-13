@@ -4,3 +4,4 @@ export * from "./auth";
 export * from "./projects";
 export * from "./documents";
 export * from "./questions";
+export * from "./answers";
