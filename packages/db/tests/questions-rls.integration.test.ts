@@ -491,3 +491,109 @@ describe("answer_versions.review_status UPDATE (S11/S13 검토 흐름)", () => {
     ).rejects.toThrow();
   });
 });
+
+async function insertCitationChainAsOwner(orgId: string, projectId: string, createdBy: string) {
+  const questionId = await insertQuestionAsOwner(orgId, projectId, createdBy);
+  const answerId = await insertAnswerVersionAsOwner(questionId, createdBy);
+  const claimId = await asOwner(db, (tx) =>
+    tx
+      .query<{ id: string }>(
+        `insert into claims (answer_version_id, claim_index, claim_text, is_factual, evidence_status)
+         values ($1, 0, 'claim', true, 'SUPPORTED') returning id`,
+        [answerId]
+      )
+      .then((r) => r.rows[0]!.id)
+  );
+  const documentId = await asOwner(db, (tx) =>
+    tx
+      .query<{ id: string }>(
+        `insert into documents
+           (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, uploaded_by)
+         values ($1, $2, '감사보고서.pdf', $3, 'application/pdf', 1024, $4, $5)
+         returning id`,
+        [orgId, projectId, `${orgId}/${projectId}/${randomUUID()}`, "a".repeat(64), createdBy]
+      )
+      .then((r) => r.rows[0]!.id)
+  );
+  const pageId = await asOwner(db, (tx) =>
+    tx
+      .query<{ id: string }>(
+        `insert into document_pages (document_id, page_number, extracted_text) values ($1, 1, '본문') returning id`,
+        [documentId]
+      )
+      .then((r) => r.rows[0]!.id)
+  );
+  const chunkId = await asOwner(db, (tx) =>
+    tx
+      .query<{ id: string }>(
+        `insert into document_chunks
+           (organization_id, project_id, document_id, page_id, chunk_index, content, content_sha256, token_count)
+         values ($1, $2, $3, $4, 0, '청크 내용', $5, 10)
+         returning id`,
+        [orgId, projectId, documentId, pageId, "b".repeat(64)]
+      )
+      .then((r) => r.rows[0]!.id)
+  );
+  const citationId = await asOwner(db, (tx) =>
+    tx
+      .query<{ id: string }>(
+        `insert into citations (claim_id, chunk_id, quote_text, page_number, relevance_score, verdict)
+         values ($1, $2, '인용', 1, 0.9, 'SUPPORTS') returning id`,
+        [claimId, chunkId]
+      )
+      .then((r) => r.rows[0]!.id)
+  );
+  return { citationId };
+}
+
+describe("tenant isolation (citation_feedback)", () => {
+  it("다른 조직 멤버는 citation_feedback row를 조회할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("owner-b", "OWNER");
+    const { citationId } = await insertCitationChainAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const feedbackId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into citation_feedback (citation_id, user_id, feedback) values ($1, $2, 'ACCURATE') returning id`,
+          [citationId, orgA.userId]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+
+    const rows = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("select * from citation_feedback where id = $1", [feedbackId])
+    );
+
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it("VIEWER도 citation_feedback을 남길 수 있다 (role 무관, 전체 멤버 허용)", async () => {
+    const orgA = await seedOrgWithMemberAndProject("viewer-a", "VIEWER");
+    const { citationId } = await insertCitationChainAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query(
+        `insert into citation_feedback (citation_id, user_id, feedback, comment)
+         values ($1, $2, 'INSUFFICIENT', '페이지가 다릅니다') returning id`,
+        [citationId, orgA.userId]
+      )
+    );
+
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("다른 사용자 명의로는 citation_feedback을 남길 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("viewer-a", "VIEWER");
+    const orgAOther = await seedOrgWithMemberAndProject("viewer-a2", "VIEWER");
+    const { citationId } = await insertCitationChainAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+
+    await expect(
+      withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+        tx.query(
+          `insert into citation_feedback (citation_id, user_id, feedback) values ($1, $2, 'ACCURATE')`,
+          [citationId, orgAOther.userId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+});
