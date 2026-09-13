@@ -261,8 +261,8 @@ export function NewProjectForm({ organizationId }: { organizationId: string }) {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <span>{label}</span>
-      <span className="text-right text-foreground">{value || "-"}</span>
+      <dt>{label}</dt>
+      <dd className="text-right text-foreground">{value || "-"}</dd>
     </div>
   );
 }

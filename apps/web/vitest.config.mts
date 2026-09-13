@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules", ".next", "tests/e2e/**"],
+    setupFiles: ["./test/axe-setup.ts"],
   },
   resolve: {
     alias: {
