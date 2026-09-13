@@ -241,3 +241,62 @@ describe("tenant isolation (document_chunks)", () => {
     expect(rows.rows).toHaveLength(1);
   });
 });
+
+describe("documents unique(project_id, sha256, version) -- 소프트 삭제 예외", () => {
+  it("소프트 삭제된 문서와 같은 sha256/version이어도 재업로드가 허용된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const sha256 = "c".repeat(64);
+
+    const firstId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, version, uploaded_by)
+           values ($1, $2, 'a.pdf', $3, 'application/pdf', 1024, $4, 1, $5)
+           returning id`,
+          [orgA.orgId, orgA.projectId, `${orgA.orgId}/${orgA.projectId}/${randomUUID()}`, sha256, orgA.userId]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+
+    await asOwner(db, (tx) =>
+      tx.query("update documents set status = 'DELETING', deleted_at = now() where id = $1", [firstId])
+    );
+
+    await expect(
+      asOwner(db, (tx) =>
+        tx.query(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, version, uploaded_by)
+           values ($1, $2, 'a.pdf', $3, 'application/pdf', 1024, $4, 1, $5)`,
+          [orgA.orgId, orgA.projectId, `${orgA.orgId}/${orgA.projectId}/${randomUUID()}`, sha256, orgA.userId]
+        )
+      )
+    ).resolves.not.toThrow();
+  });
+
+  it("소프트 삭제되지 않은 문서와 같은 sha256/version은 여전히 거부된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const sha256 = "d".repeat(64);
+
+    await asOwner(db, (tx) =>
+      tx.query(
+        `insert into documents
+           (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, version, uploaded_by)
+         values ($1, $2, 'a.pdf', $3, 'application/pdf', 1024, $4, 1, $5)`,
+        [orgA.orgId, orgA.projectId, `${orgA.orgId}/${orgA.projectId}/${randomUUID()}`, sha256, orgA.userId]
+      )
+    );
+
+    await expect(
+      asOwner(db, (tx) =>
+        tx.query(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, version, uploaded_by)
+           values ($1, $2, 'a.pdf', $3, 'application/pdf', 1024, $4, 1, $5)`,
+          [orgA.orgId, orgA.projectId, `${orgA.orgId}/${orgA.projectId}/${randomUUID()}`, sha256, orgA.userId]
+        )
+      )
+    ).rejects.toThrow();
+  });
+});
