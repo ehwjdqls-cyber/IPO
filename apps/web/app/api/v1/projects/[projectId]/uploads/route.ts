@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { can, createUploadRequestSchema } from "@ipo/contracts";
+import { can, createUploadRequestSchema, extensionForMediaType } from "@ipo/contracts";
 import { getAuthenticatedUser } from "../../../../../../lib/auth";
 import { withRequestScope } from "../../../../../../lib/db";
 import { getMembership } from "../../../../../../lib/membership";
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: RouteContext) {
 
       const documentId = randomUUID();
       const version = existing.rows.length > 0 ? existing.rows[0]!.version + 1 : 1;
-      const storageKey = `${project.organizationId}/${projectId}/${documentId}/${filename}`;
+      const storageKey = `${project.organizationId}/${projectId}/${documentId}${extensionForMediaType(mediaType)}`;
 
       const inserted = await client.query<{ id: string }>(
         `insert into documents

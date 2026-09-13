@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completeUploadRequestSchema,
   createUploadRequestSchema,
+  extensionForMediaType,
   updateDocumentPageRequestSchema,
 } from "./documents";
 
@@ -80,5 +81,19 @@ describe("updateDocumentPageRequestSchema", () => {
   it("excluded가 없으면 거부한다", () => {
     const result = updateDocumentPageRequestSchema.safeParse({});
     expect(result.success).toBe(false);
+  });
+});
+
+describe("extensionForMediaType", () => {
+  it("각 허용된 media type에 대해 올바른 확장자를 반환한다", () => {
+    expect(extensionForMediaType("application/pdf")).toBe(".pdf");
+    expect(
+      extensionForMediaType(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      )
+    ).toBe(".docx");
+    expect(
+      extensionForMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    ).toBe(".xlsx");
   });
 });
