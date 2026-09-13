@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createAnswerJobRequestSchema, createAnswerVersionRequestSchema } from "./answers";
+import {
+  createAnswerJobRequestSchema,
+  createAnswerVersionRequestSchema,
+  createReviewRequestSchema,
+} from "./answers";
 
 describe("createAnswerJobRequestSchema", () => {
   it("빈 객체도 통과한다 (모두 선택값, 기본값 적용)", () => {
@@ -91,5 +95,27 @@ describe("createAnswerVersionRequestSchema", () => {
       claims: [{ ...validClaim, isFactual: false, citationIds: [] }],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("createReviewRequestSchema", () => {
+  it("decision만으로도 통과한다 (comment는 선택값)", () => {
+    expect(createReviewRequestSchema.safeParse({ decision: "APPROVED" }).success).toBe(true);
+  });
+
+  it("comment를 포함할 수 있다", () => {
+    const result = createReviewRequestSchema.safeParse({
+      decision: "REJECTED",
+      comment: "2025년 수치는 감사보고서와 불일치합니다.",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("허용되지 않은 decision은 거부한다", () => {
+    expect(createReviewRequestSchema.safeParse({ decision: "PENDING" }).success).toBe(false);
+  });
+
+  it("빈 comment는 거부한다", () => {
+    expect(createReviewRequestSchema.safeParse({ decision: "APPROVED", comment: "" }).success).toBe(false);
   });
 });

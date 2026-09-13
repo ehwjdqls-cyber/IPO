@@ -47,3 +47,12 @@ export const createAnswerVersionRequestSchema = z.object({
   claims: z.array(answerVersionClaimInputSchema).min(1),
 });
 export type CreateAnswerVersionRequest = z.infer<typeof createAnswerVersionRequestSchema>;
+
+/** spec 20.6: POST /answer-versions/{answerVersionId}/reviews. comment는
+ * REJECTED일 때 사유를 남기는 용도로 흔히 쓰이지만 스펙 예시가 필수라고
+ * 못박지 않아 선택값으로 둔다. */
+export const createReviewRequestSchema = z.object({
+  decision: z.enum(REVIEW_DECISIONS),
+  comment: z.string().trim().min(1).max(2000).optional(),
+});
+export type CreateReviewRequest = z.infer<typeof createReviewRequestSchema>;
