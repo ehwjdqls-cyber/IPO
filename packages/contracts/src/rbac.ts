@@ -8,7 +8,9 @@ export type Action =
   | "member.manage"
   | "org.update"
   | "document.manage"
-  | "document.read";
+  | "document.read"
+  | "job.manage"
+  | "job.read";
 
 export class ForbiddenError extends Error {
   constructor(role: MemberRole, action: Action) {
@@ -27,6 +29,8 @@ const permissions: Record<MemberRole, ReadonlySet<Action>> = {
     "org.update",
     "document.manage",
     "document.read",
+    "job.manage",
+    "job.read",
   ]),
   ADMIN: new Set<Action>([
     "project.create",
@@ -36,6 +40,8 @@ const permissions: Record<MemberRole, ReadonlySet<Action>> = {
     "member.manage",
     "document.manage",
     "document.read",
+    "job.manage",
+    "job.read",
   ]),
   EDITOR: new Set<Action>([
     "project.create",
@@ -43,9 +49,11 @@ const permissions: Record<MemberRole, ReadonlySet<Action>> = {
     "project.update",
     "document.manage",
     "document.read",
+    "job.manage",
+    "job.read",
   ]),
-  REVIEWER: new Set<Action>(["project.read", "document.read"]),
-  VIEWER: new Set<Action>(["project.read", "document.read"]),
+  REVIEWER: new Set<Action>(["project.read", "document.read", "job.read"]),
+  VIEWER: new Set<Action>(["project.read", "document.read", "job.read"]),
 };
 
 export function can(role: MemberRole, action: Action): boolean {

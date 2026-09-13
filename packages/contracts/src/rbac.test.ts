@@ -52,6 +52,20 @@ describe("can", () => {
     ["EDITOR", "document.read", true],
     ["REVIEWER", "document.read", true],
     ["VIEWER", "document.read", true],
+
+    // job.manage covers cancel/retry (S09) -- jobs RLS 0013 grants
+    // insert/update at EDITOR+, same threshold as document.manage.
+    ["OWNER", "job.manage", true],
+    ["ADMIN", "job.manage", true],
+    ["EDITOR", "job.manage", true],
+    ["REVIEWER", "job.manage", false],
+    ["VIEWER", "job.manage", false],
+
+    ["OWNER", "job.read", true],
+    ["ADMIN", "job.read", true],
+    ["EDITOR", "job.read", true],
+    ["REVIEWER", "job.read", true],
+    ["VIEWER", "job.read", true],
   ])("%s가 %s를 수행할 수 있는지 = %s", (role, action, expected) => {
     expect(can(role, action)).toBe(expected);
   });
