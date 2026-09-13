@@ -1,7 +1,7 @@
 import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { vector } from "@electric-sql/pglite-pgvector";
-import { runMigrations } from "@ipo/db";
+import { runMigrations } from "@ipo/db/migrate";
 
 /**
  * Duplicates packages/db/tests/pglite-harness.ts's shape (createTestDb +
