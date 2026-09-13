@@ -18,13 +18,15 @@ import {
 type Market = "KOSPI" | "KOSDAQ" | "KONEX" | "UNDECIDED";
 type Step = "basic" | "listing" | "scope" | "confirm";
 
+// spec 5절 질문 카테고리 6개와 정확히 일치해야 한다 (DB question_category
+// enum과 동일한 코드) -- 이전에는 GOVERNANCE/LEGAL로 잘못 나뉘어 있었음.
 const CATEGORIES = [
   { code: "BUSINESS", label: "사업모델·성장성" },
   { code: "FINANCE", label: "재무·수익성" },
   { code: "CUSTOMER", label: "고객·거래처" },
-  { code: "GOVERNANCE", label: "지배구조·내부통제" },
-  { code: "LEGAL", label: "법률·규제" },
-  { code: "RISK", label: "리스크·기타" },
+  { code: "GOVERNANCE", label: "지배구조" },
+  { code: "INTERNAL_CONTROL", label: "내부통제" },
+  { code: "RISK", label: "주요 위험" },
 ];
 
 const STEPS: { key: Step; label: string }[] = [
