@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@ipo/contracts": "workspace:*",
-    "@ipo/db": "workspace:*"
+    "@ipo/db": "workspace:*",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
