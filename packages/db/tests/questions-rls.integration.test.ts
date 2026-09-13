@@ -232,7 +232,7 @@ describe("tenant isolation (claims / citations)", () => {
     expect(rows.rows).toHaveLength(1);
   });
 
-  it("EDITOR role도 claims INSERT가 거부된다 (worker 전용)", async () => {
+  it("EDITOR role도 AI 생성 answer_version(source='AI')에는 claims INSERT가 거부된다 (worker 전용)", async () => {
     const orgA = await seedOrgWithMemberAndProject("editor-a", "EDITOR");
     const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
     const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
@@ -246,6 +246,81 @@ describe("tenant isolation (claims / citations)", () => {
         )
       )
     ).rejects.toThrow();
+  });
+
+  it("EDITOR role은 자신이 저장한 USER 편집본(source='USER')에는 claims/citations INSERT가 허용된다 (spec 20.5)", async () => {
+    const orgA = await seedOrgWithMemberAndProject("editor-a", "EDITOR");
+    const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+
+    const userAnswerId = await withScope(
+      db,
+      { userId: orgA.userId, organizationId: orgA.orgId },
+      (tx) =>
+        tx
+          .query<{ id: string }>(
+            `insert into answer_versions (question_id, version, body_markdown, source, evidence_status, created_by)
+             values ($1, 1, 'body', 'USER', 'SUPPORTED', $2) returning id`,
+            [questionId, orgA.userId]
+          )
+          .then((r) => r.rows[0]!.id)
+    );
+
+    const claimId = await withScope(
+      db,
+      { userId: orgA.userId, organizationId: orgA.orgId },
+      (tx) =>
+        tx
+          .query<{ id: string }>(
+            `insert into claims (answer_version_id, claim_index, claim_text, is_factual, evidence_status)
+             values ($1, 0, 'claim', true, 'SUPPORTED') returning id`,
+            [userAnswerId]
+          )
+          .then((r) => r.rows[0]!.id)
+    );
+
+    const documentId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into documents
+             (organization_id, project_id, original_filename, storage_key, media_type, byte_size, sha256, uploaded_by)
+           values ($1, $2, '감사보고서.pdf', $3, 'application/pdf', 1024, $4, $5)
+           returning id`,
+          [orgA.orgId, orgA.projectId, `${orgA.orgId}/${orgA.projectId}/${randomUUID()}`, "a".repeat(64), orgA.userId]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+    const pageId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into document_pages (document_id, page_number, extracted_text) values ($1, 1, '본문') returning id`,
+          [documentId]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+    const chunkId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into document_chunks
+             (organization_id, project_id, document_id, page_id, chunk_index, content, content_sha256, token_count)
+           values ($1, $2, $3, $4, 0, '청크 내용', $5, 10)
+           returning id`,
+          [orgA.orgId, orgA.projectId, documentId, pageId, "b".repeat(64)]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+
+    const result = await withScope(
+      db,
+      { userId: orgA.userId, organizationId: orgA.orgId },
+      (tx) =>
+        tx.query(
+          `insert into citations (claim_id, chunk_id, quote_text, page_number, relevance_score, verdict)
+           values ($1, $2, '인용', 1, 0.9, 'SUPPORTS') returning id`,
+          [claimId, chunkId]
+        )
+    );
+
+    expect(result.rows).toHaveLength(1);
   });
 });
 
