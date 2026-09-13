@@ -12,12 +12,15 @@
   "dependencies": {
     "@ipo/contracts": "workspace:*",
     "@ipo/db": "workspace:*",
+    "pg": "^8.23.0",
     "zod": "^4.6.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@electric-sql/pglite-pgvector": "^0.0.9",
     "@types/node": "^22.20.2",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.0"
   }

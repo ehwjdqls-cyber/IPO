@@ -217,6 +217,9 @@ importers:
       '@ipo/db':
         specifier: workspace:*
         version: link:../db
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
       zod:
         specifier: ^4.6.2
         version: 4.6.2
@@ -230,6 +233,12 @@ importers:
       '@types/node':
         specifier: ^22.20.2
         version: 22.20.2
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: ^5
         version: 5.9.3
