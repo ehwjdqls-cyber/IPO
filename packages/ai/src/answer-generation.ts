@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { EVIDENCE_STATUSES, type EvidenceStatus } from "@ipo/contracts";
 import type { RetrievedChunkForPrompt } from "./question-generation";
 
-export type { RetrievedChunkForPrompt };
+export type { RetrievedChunkForPrompt, EvidenceStatus };
 
 /**
  * spec 25절 "근거 기반 답변 생성 프롬프트" + 26절 "Citation 검증 로직".
@@ -9,9 +10,6 @@ export type { RetrievedChunkForPrompt };
  * "Responses API 호환 어댑터").
  */
 export const ANSWER_GENERATION_PROMPT_ID = "grounded-answer-ko-v1.0.0";
-
-const EVIDENCE_STATUSES = ["SUPPORTED", "PARTIAL", "NEEDS_EVIDENCE", "CONFLICT"] as const;
-export type EvidenceStatus = (typeof EVIDENCE_STATUSES)[number];
 
 const CITATION_VERDICTS = ["SUPPORTS", "PARTIAL", "CONFLICTS"] as const;
 
