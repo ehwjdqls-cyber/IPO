@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PRIORITY_LEVELS, QUESTION_CATEGORIES } from "@ipo/contracts";
 
 /**
  * spec 24절 "예상 질문 생성 프롬프트". Uses the OpenAI Responses API
@@ -9,17 +10,6 @@ import { z } from "zod";
  * guessed.
  */
 export const QUESTION_GENERATION_PROMPT_ID = "question-generation-ko-v1.0.0";
-
-const QUESTION_CATEGORIES = [
-  "BUSINESS",
-  "FINANCE",
-  "CUSTOMER",
-  "GOVERNANCE",
-  "INTERNAL_CONTROL",
-  "RISK",
-] as const;
-
-const PRIORITY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
 const generatedQuestionSchema = z
   .object({
