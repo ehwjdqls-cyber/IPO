@@ -1,5 +1,5 @@
 import "server-only";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getServerEnv } from "./env";
 
@@ -43,6 +43,23 @@ export async function createPresignedUploadUrl(
     Bucket: env.OBJECT_STORAGE_BUCKET,
     Key: storageKey,
     ContentType: contentType,
+  });
+  return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
+}
+
+/**
+ * Presigned GET URL for S07's 원문 렌더링/다운로드 -- same 5-minute-TTL threat
+ * model as the upload URL, and equally safe to unit test (local signing,
+ * no network call).
+ */
+export async function createPresignedDownloadUrl(
+  storageKey: string,
+  expiresInSeconds = 300
+): Promise<string> {
+  const env = getServerEnv();
+  const command = new GetObjectCommand({
+    Bucket: env.OBJECT_STORAGE_BUCKET,
+    Key: storageKey,
   });
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }

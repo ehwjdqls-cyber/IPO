@@ -25,6 +25,7 @@ export interface DocumentDto {
   organizationId: string;
   projectId: string;
   originalFilename: string;
+  storageKey: string;
   mediaType: string;
   byteSize: number;
   sha256: string;
@@ -44,6 +45,7 @@ export function toDocumentDto(row: DocumentRow): DocumentDto {
     organizationId: row.organization_id,
     projectId: row.project_id,
     originalFilename: row.original_filename,
+    storageKey: row.storage_key,
     mediaType: row.media_type,
     byteSize: Number(row.byte_size),
     sha256: row.sha256,

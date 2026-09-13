@@ -26,3 +26,8 @@ export const completeUploadRequestSchema = z.object({
   byteSize: z.number().int().min(1).max(MAX_DOCUMENT_BYTES),
 });
 export type CompleteUploadRequest = z.infer<typeof completeUploadRequestSchema>;
+
+export const updateDocumentPageRequestSchema = z.object({
+  excluded: z.boolean(),
+});
+export type UpdateDocumentPageRequest = z.infer<typeof updateDocumentPageRequestSchema>;

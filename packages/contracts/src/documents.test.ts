@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { completeUploadRequestSchema, createUploadRequestSchema } from "./documents";
+import {
+  completeUploadRequestSchema,
+  createUploadRequestSchema,
+  updateDocumentPageRequestSchema,
+} from "./documents";
 
 describe("createUploadRequestSchema", () => {
   const valid = {
@@ -55,6 +59,26 @@ describe("completeUploadRequestSchema", () => {
 
   it("sha256 누락 시 거부한다", () => {
     const result = completeUploadRequestSchema.safeParse({ byteSize: 1024 });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("updateDocumentPageRequestSchema", () => {
+  it("excluded=true는 통과한다", () => {
+    expect(updateDocumentPageRequestSchema.safeParse({ excluded: true }).success).toBe(true);
+  });
+
+  it("excluded=false는 통과한다", () => {
+    expect(updateDocumentPageRequestSchema.safeParse({ excluded: false }).success).toBe(true);
+  });
+
+  it("excluded가 boolean이 아니면 거부한다", () => {
+    const result = updateDocumentPageRequestSchema.safeParse({ excluded: "true" });
+    expect(result.success).toBe(false);
+  });
+
+  it("excluded가 없으면 거부한다", () => {
+    const result = updateDocumentPageRequestSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 });

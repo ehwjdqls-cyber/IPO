@@ -34,3 +34,25 @@ describe("createPresignedUploadUrl", () => {
     expect(parsed.searchParams.get("X-Amz-Expires")).toBe("600");
   });
 });
+
+describe("createPresignedDownloadUrl", () => {
+  it("버킷·키가 포함된 서명된 GET URL을 반환한다", async () => {
+    const { createPresignedDownloadUrl } = await import("./storage");
+
+    const url = await createPresignedDownloadUrl("org-1/project-1/document-1/report.pdf");
+
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe("https://storage.example.com");
+    expect(parsed.pathname).toBe("/ipo-proof-documents/org-1/project-1/document-1/report.pdf");
+    expect(parsed.searchParams.get("X-Amz-Signature")).toBeTruthy();
+  });
+
+  it("만료시간(초)이 X-Amz-Expires에 반영된다", async () => {
+    const { createPresignedDownloadUrl } = await import("./storage");
+
+    const url = await createPresignedDownloadUrl("k", 600);
+
+    const parsed = new URL(url);
+    expect(parsed.searchParams.get("X-Amz-Expires")).toBe("600");
+  });
+});

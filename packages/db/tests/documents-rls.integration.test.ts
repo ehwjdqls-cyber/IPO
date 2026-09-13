@@ -174,6 +174,45 @@ describe("tenant isolation (document_pages)", () => {
   });
 });
 
+describe("document_pages UPDATE (S07 페이지 제외)", () => {
+  it("VIEWER role은 document_pages.excluded 변경이 거부된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("viewer-a", "VIEWER");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("update document_pages set excluded = true where id = $1 returning id", [pageId])
+    );
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("EDITOR role은 같은 조직의 document_pages.excluded를 변경할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("editor-a", "EDITOR");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("update document_pages set excluded = true where id = $1 returning id", [pageId])
+    );
+
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("다른 조직의 EDITOR는 document_pages.excluded를 변경할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("editor-b", "EDITOR");
+    const documentId = await insertDocumentAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const pageId = await insertPageAsOwner(documentId);
+
+    const result = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query("update document_pages set excluded = true where id = $1 returning id", [pageId])
+    );
+
+    expect(result.rows).toHaveLength(0);
+  });
+});
+
 describe("tenant isolation (document_chunks)", () => {
   it("다른 조직 멤버는 document_chunks row를 조회할 수 없다 (retrieval 오염 방지 핵심 불변조건)", async () => {
     const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
