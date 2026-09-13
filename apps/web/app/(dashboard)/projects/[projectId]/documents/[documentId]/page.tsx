@@ -10,9 +10,12 @@ import { listDocumentJobs } from "../../../../../../lib/queries/jobs";
 import { createPresignedDownloadUrl } from "../../../../../../lib/storage";
 import { Badge } from "../../../../../../components/ui/badge";
 import { Card } from "../../../../../../components/ui/card";
+import { AutoRefresh } from "../../../../../../components/auto-refresh";
 import { PageSearch } from "./page-search";
 import { ExcludePageToggle } from "./exclude-page-toggle";
 import { ReprocessButton } from "./reprocess-button";
+
+const PROCESSING_STATUSES = new Set(["UPLOADED", "SCANNING", "EXTRACTING", "INDEXING"]);
 
 const STATUS_LABEL: Record<string, string> = {
   UPLOADED: "업로드됨",
@@ -71,6 +74,7 @@ export default async function DocumentDetailPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
+      <AutoRefresh active={PROCESSING_STATUSES.has(document.status)} />
       <div className="flex items-center justify-between">
         <div>
           <Link

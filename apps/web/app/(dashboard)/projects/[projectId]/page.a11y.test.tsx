@@ -14,7 +14,7 @@ const { getAuthenticatedUser, findProjectById, listDocuments, notFound } = vi.ho
 vi.mock("../../../../lib/auth", () => ({ getAuthenticatedUser }));
 vi.mock("../../../../lib/queries/projects", () => ({ findProjectById }));
 vi.mock("../../../../lib/queries/documents", () => ({ listDocuments }));
-vi.mock("next/navigation", () => ({ notFound }));
+vi.mock("next/navigation", () => ({ notFound, useRouter: () => ({ refresh: vi.fn() }) }));
 
 const project = {
   id: "project-1",

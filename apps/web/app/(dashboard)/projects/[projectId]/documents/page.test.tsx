@@ -15,7 +15,7 @@ vi.mock("../../../../../lib/auth", () => ({ getAuthenticatedUser }));
 vi.mock("../../../../../lib/queries/projects", () => ({ findProjectById }));
 vi.mock("../../../../../lib/membership", () => ({ getMembership }));
 vi.mock("../../../../../lib/queries/documents", () => ({ listDocuments }));
-vi.mock("next/navigation", () => ({ notFound }));
+vi.mock("next/navigation", () => ({ notFound, useRouter: () => ({ refresh: vi.fn() }) }));
 
 const project = { id: "project-1", organizationId: "org-1", companyNameKo: "예시회사" };
 

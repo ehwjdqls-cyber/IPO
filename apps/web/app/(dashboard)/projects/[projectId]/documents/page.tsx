@@ -16,6 +16,9 @@ import {
 } from "../../../../../components/ui/table";
 import { UploadForm } from "./upload-form";
 import { DocumentRowActions } from "./document-row-actions";
+import { AutoRefresh } from "../../../../../components/auto-refresh";
+
+const PROCESSING_STATUSES = new Set(["UPLOADED", "SCANNING", "EXTRACTING", "INDEXING"]);
 
 const STATUS_LABEL: Record<string, string> = {
   UPLOADED: "업로드됨",
@@ -68,9 +71,11 @@ export default async function DocumentsPage({
 
   const documents = await listDocuments(user.id, project.organizationId, projectId);
   const canManage = can(membership.role, "document.manage");
+  const hasProcessingDocuments = documents.some((doc) => PROCESSING_STATUSES.has(doc.status));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <AutoRefresh active={hasProcessingDocuments} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">문서 센터</h1>

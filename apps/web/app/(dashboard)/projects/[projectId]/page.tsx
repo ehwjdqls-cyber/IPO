@@ -5,6 +5,9 @@ import { findProjectById } from "../../../../lib/queries/projects";
 import { listDocuments } from "../../../../lib/queries/documents";
 import { Button } from "../../../../components/ui/button";
 import { Card, CardContent } from "../../../../components/ui/card";
+import { AutoRefresh } from "../../../../components/auto-refresh";
+
+const PROCESSING_STATUSES = new Set(["UPLOADED", "SCANNING", "EXTRACTING", "INDEXING"]);
 
 const MARKET_LABEL: Record<string, string> = {
   KOSPI: "KOSPI",
@@ -32,9 +35,11 @@ export default async function ProjectDashboardPage({
   const documents = await listDocuments(user.id, project.organizationId, projectId);
   const readyCount = documents.filter((d) => d.status === "READY").length;
   const failedCount = documents.filter((d) => d.status === "FAILED").length;
+  const hasProcessingDocuments = documents.some((d) => PROCESSING_STATUSES.has(d.status));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <AutoRefresh active={hasProcessingDocuments} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-foreground">{project.companyNameKo}</h1>

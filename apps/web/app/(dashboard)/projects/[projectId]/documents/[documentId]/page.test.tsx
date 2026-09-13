@@ -30,7 +30,7 @@ vi.mock("../../../../../../lib/queries/documents", () => ({ findDocumentById }))
 vi.mock("../../../../../../lib/queries/document-pages", () => ({ listDocumentPages }));
 vi.mock("../../../../../../lib/queries/jobs", () => ({ listDocumentJobs }));
 vi.mock("../../../../../../lib/storage", () => ({ createPresignedDownloadUrl }));
-vi.mock("next/navigation", () => ({ notFound }));
+vi.mock("next/navigation", () => ({ notFound, useRouter: () => ({ refresh: vi.fn() }) }));
 
 const project = { id: "project-1", organizationId: "org-1", companyNameKo: "예시회사" };
 const document = {
