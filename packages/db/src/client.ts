@@ -1,4 +1,5 @@
 import pg from "pg";
+import "./pg-types";
 
 const { Pool } = pg;
 

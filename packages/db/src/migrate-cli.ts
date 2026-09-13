@@ -1,4 +1,5 @@
 import pg from "pg";
+import "./pg-types";
 import { runMigrations } from "./migrate";
 
 async function main(): Promise<void> {
