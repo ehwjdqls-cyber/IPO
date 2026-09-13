@@ -19,6 +19,10 @@ const jobRow = {
   input: { documentId: "doc-1" },
 };
 
+function makeRequest(headers: Record<string, string> = { "Idempotency-Key": "key-1" }) {
+  return new Request("http://localhost/x", { method: "POST", headers });
+}
+
 describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
   beforeEach(() => {
     getAuthenticatedUser.mockReset();
@@ -30,7 +34,7 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
     getAuthenticatedUser.mockResolvedValue(null);
     const { POST } = await import("./route");
 
-    const response = await POST(new Request("http://localhost/x"), ctx);
+    const response = await POST(makeRequest(), ctx);
 
     expect(response.status).toBe(401);
   });
@@ -42,7 +46,7 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
     );
     const { POST } = await import("./route");
 
-    const response = await POST(new Request("http://localhost/x"), ctx);
+    const response = await POST(makeRequest(), ctx);
 
     expect(response.status).toBe(404);
   });
@@ -55,9 +59,22 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
     getMembership.mockResolvedValue({ role: "VIEWER" });
     const { POST } = await import("./route");
 
-    const response = await POST(new Request("http://localhost/x"), ctx);
+    const response = await POST(makeRequest(), ctx);
 
     expect(response.status).toBe(403);
+  });
+
+  it("Idempotency-Key 헤더가 없으면 422를 반환한다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    withRequestScope.mockImplementation(async (_scope, fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rows: [jobRow] }) } as never)
+    );
+    const { POST } = await import("./route");
+
+    const response = await POST(makeRequest({}), ctx);
+
+    expect(response.status).toBe(422);
   });
 
   it("FAILED 상태가 아니면 409를 반환한다", async () => {
@@ -68,7 +85,7 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
     );
     const { POST } = await import("./route");
 
-    const response = await POST(new Request("http://localhost/x"), ctx);
+    const response = await POST(makeRequest(), ctx);
 
     expect(response.status).toBe(409);
   });
@@ -83,7 +100,7 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
     withRequestScope.mockImplementation(async (_scope, fn) => fn({ query } as never));
     const { POST } = await import("./route");
 
-    const response = await POST(new Request("http://localhost/x"), ctx);
+    const response = await POST(makeRequest(), ctx);
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -95,9 +112,27 @@ describe("POST /api/v1/projects/{projectId}/jobs/{jobId}/retry", () => {
       "org-1",
       "project-1",
       "DOCUMENT_PROCESS",
-      expect.stringContaining("job-1"),
+      "key-1",
       JSON.stringify({ documentId: "doc-1" }),
       "user-1",
     ]);
+  });
+
+  it("동일한 Idempotency-Key로 재요청하면 새 job을 만들지 않고 기존 job을 반환한다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [jobRow] })
+      .mockRejectedValueOnce({ code: "23505" })
+      .mockResolvedValueOnce({ rows: [{ id: "job-existing", status: "QUEUED" }] });
+    withRequestScope.mockImplementation(async (_scope, fn) => fn({ query } as never));
+    const { POST } = await import("./route");
+
+    const response = await POST(makeRequest(), ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.id).toBe("job-existing");
   });
 });

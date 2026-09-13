@@ -3,6 +3,8 @@ import { getAuthenticatedUser } from "../../../../../../../../lib/auth";
 import { withRequestScope } from "../../../../../../../../lib/db";
 import { getMembership } from "../../../../../../../../lib/membership";
 import { apiError, apiOk } from "../../../../../../../../lib/api/response";
+import { getIdempotencyKey } from "../../../../../../../../lib/api/idempotency";
+import { isUniqueViolation } from "../../../../../../../../lib/api/postgres-errors";
 
 type RouteContext = { params: Promise<{ projectId: string; jobId: string }> };
 
@@ -20,7 +22,7 @@ interface NewJobRow {
   status: string;
 }
 
-export async function POST(_request: Request, { params }: RouteContext) {
+export async function POST(request: Request, { params }: RouteContext) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return apiError("UNAUTHENTICATED", "로그인이 필요합니다.");
@@ -48,23 +50,30 @@ export async function POST(_request: Request, { params }: RouteContext) {
     return apiError("CONFLICT", "실패한 작업만 재시도할 수 있습니다.");
   }
 
+  const idempotencyKey = getIdempotencyKey(request);
+  if (!idempotencyKey) {
+    return apiError("VALIDATION_ERROR", "Idempotency-Key 헤더가 필요합니다.");
+  }
+
   const newJob = await withRequestScope(
     { userId: user.id, organizationId: job.organization_id },
     async (client) => {
-      const result = await client.query<NewJobRow>(
-        `insert into jobs (organization_id, project_id, type, idempotency_key, input, created_by)
-         values ($1, $2, $3, $4, $5, $6)
-         returning id, status`,
-        [
-          job.organization_id,
-          job.project_id,
-          job.type,
-          `retry-${jobId}-${Date.now()}`,
-          JSON.stringify(job.input),
-          user.id,
-        ]
-      );
-      return result.rows[0]!;
+      try {
+        const result = await client.query<NewJobRow>(
+          `insert into jobs (organization_id, project_id, type, idempotency_key, input, created_by)
+           values ($1, $2, $3, $4, $5, $6)
+           returning id, status`,
+          [job.organization_id, job.project_id, job.type, idempotencyKey, JSON.stringify(job.input), user.id]
+        );
+        return result.rows[0]!;
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        const existing = await client.query<NewJobRow>(
+          `select id, status from jobs where organization_id = $1 and idempotency_key = $2`,
+          [job.organization_id, idempotencyKey]
+        );
+        return existing.rows[0]!;
+      }
     }
   );
 

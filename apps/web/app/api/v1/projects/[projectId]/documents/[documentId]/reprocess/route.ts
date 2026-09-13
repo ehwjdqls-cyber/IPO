@@ -8,6 +8,8 @@ import {
   type DocumentRow,
 } from "../../../../../../../../lib/documents";
 import { apiError, apiOk } from "../../../../../../../../lib/api/response";
+import { getIdempotencyKey } from "../../../../../../../../lib/api/idempotency";
+import { isUniqueViolation } from "../../../../../../../../lib/api/postgres-errors";
 
 type RouteContext = { params: Promise<{ projectId: string; documentId: string }> };
 
@@ -20,7 +22,7 @@ async function findDocument(userId: string, documentId: string): Promise<Documen
   return result.rows[0] ?? null;
 }
 
-export async function POST(_request: Request, { params }: RouteContext) {
+export async function POST(request: Request, { params }: RouteContext) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return apiError("UNAUTHENTICATED", "로그인이 필요합니다.");
@@ -37,6 +39,11 @@ export async function POST(_request: Request, { params }: RouteContext) {
     return apiError("FORBIDDEN", "문서를 재처리할 권한이 없습니다.");
   }
 
+  const idempotencyKey = getIdempotencyKey(request);
+  if (!idempotencyKey) {
+    return apiError("VALIDATION_ERROR", "Idempotency-Key 헤더가 필요합니다.");
+  }
+
   const { updatedDocument, job } = await withRequestScope(
     { userId: user.id, organizationId: document.organization_id },
     async (client) => {
@@ -47,19 +54,32 @@ export async function POST(_request: Request, { params }: RouteContext) {
          returning ${DOCUMENT_COLUMNS}`,
         [documentId]
       );
-      const createdJob = await client.query<{ id: string; status: string }>(
-        `insert into jobs (organization_id, project_id, type, idempotency_key, input, created_by)
-         values ($1, $2, 'DOCUMENT_PROCESS', $3, $4, $5)
-         returning id, status`,
-        [
-          document.organization_id,
-          document.project_id,
-          `document-reprocess-${documentId}-${Date.now()}`,
-          JSON.stringify({ documentId }),
-          user.id,
-        ]
-      );
-      return { updatedDocument: updated.rows[0]!, job: createdJob.rows[0]! };
+
+      let createdJob: { id: string; status: string };
+      try {
+        const inserted = await client.query<{ id: string; status: string }>(
+          `insert into jobs (organization_id, project_id, type, idempotency_key, input, created_by)
+           values ($1, $2, 'DOCUMENT_PROCESS', $3, $4, $5)
+           returning id, status`,
+          [
+            document.organization_id,
+            document.project_id,
+            idempotencyKey,
+            JSON.stringify({ documentId }),
+            user.id,
+          ]
+        );
+        createdJob = inserted.rows[0]!;
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        const existing = await client.query<{ id: string; status: string }>(
+          `select id, status from jobs where organization_id = $1 and idempotency_key = $2`,
+          [document.organization_id, idempotencyKey]
+        );
+        createdJob = existing.rows[0]!;
+      }
+
+      return { updatedDocument: updated.rows[0]!, job: createdJob };
     }
   );
 

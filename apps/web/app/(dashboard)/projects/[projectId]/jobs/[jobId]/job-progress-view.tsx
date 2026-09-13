@@ -74,6 +74,7 @@ export function JobProgressView({
     setBusy(true);
     const response = await fetch(`/api/v1/projects/${projectId}/jobs/${job.id}/retry`, {
       method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
     });
     setBusy(false);
     if (response.ok) {

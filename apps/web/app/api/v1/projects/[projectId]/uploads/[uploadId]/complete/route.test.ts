@@ -30,8 +30,8 @@ const documentRow = {
   deleted_at: null,
 };
 
-function makeRequest(body: unknown) {
-  return new Request("http://localhost/x", { method: "POST", body: JSON.stringify(body) });
+function makeRequest(body: unknown, headers: Record<string, string> = { "Idempotency-Key": "key-1" }) {
+  return new Request("http://localhost/x", { method: "POST", body: JSON.stringify(body), headers });
 }
 
 describe("POST /api/v1/projects/{projectId}/uploads/{uploadId}/complete", () => {
@@ -73,6 +73,44 @@ describe("POST /api/v1/projects/{projectId}/uploads/{uploadId}/complete", () => 
     const response = await POST(makeRequest({ sha256: documentRow.sha256, byteSize: 1024 }), ctx);
 
     expect(response.status).toBe(403);
+  });
+
+  it("Idempotency-Key 헤더가 없으면 422를 반환한다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    withRequestScope.mockImplementation(async (_scope, fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rows: [documentRow] }) } as never)
+    );
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      makeRequest({ sha256: documentRow.sha256, byteSize: 1024 }, {}),
+      ctx
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("동일한 Idempotency-Key로 재요청하면 새 job을 만들지 않고 기존 job을 반환한다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [documentRow] }) // findDocument
+      .mockResolvedValueOnce({ rows: [{ ...documentRow, status: "SCANNING" }] }) // update
+      .mockRejectedValueOnce({ code: "23505" }) // insert job -- duplicate idempotency key
+      .mockResolvedValueOnce({ rows: [{ id: "job-existing", status: "QUEUED" }] }); // select existing job
+    withRequestScope.mockImplementation(async (_scope, fn) => fn({ query } as never));
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      makeRequest({ sha256: documentRow.sha256, byteSize: Number(documentRow.byte_size) }),
+      ctx
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.job.id).toBe("job-existing");
   });
 
   it("sha256이 기록된 값과 다르면 422를 반환한다 (무결성 검증)", async () => {

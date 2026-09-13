@@ -104,7 +104,10 @@ export function UploadForm({ projectId }: { projectId: string }) {
         `/api/v1/projects/${projectId}/uploads/${session.uploadId}/complete`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": crypto.randomUUID(),
+          },
           body: JSON.stringify({ sha256, byteSize: file.size }),
         }
       );

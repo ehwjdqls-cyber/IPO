@@ -33,6 +33,7 @@ export function DocumentRowActions({
     setBusy(true);
     await fetch(`/api/v1/projects/${projectId}/documents/${documentId}/reprocess`, {
       method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
     });
     setBusy(false);
     router.refresh();
