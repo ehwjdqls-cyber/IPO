@@ -333,3 +333,86 @@ describe("tenant isolation (reviews)", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("answer_versions.review_status UPDATE (S11/S13 검토 흐름)", () => {
+  it("VIEWER role은 review_status 변경이 거부된다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("viewer-a", "VIEWER");
+    const questionId = await asOwner(db, (tx) =>
+      tx
+        .query<{ id: string }>(
+          `insert into questions (organization_id, project_id, category, question_text, rationale, created_by)
+           values ($1, $2, 'RISK', 'q', 'r', $3) returning id`,
+          [orgA.orgId, orgA.projectId, orgA.userId]
+        )
+        .then((r) => r.rows[0]!.id)
+    );
+    const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query(
+        "update answer_versions set review_status = 'NEEDS_REVIEW' where id = $1 returning id",
+        [answerId]
+      )
+    );
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("EDITOR role은 검토 요청(review_status -> NEEDS_REVIEW)을 할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("editor-a", "EDITOR");
+    const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query(
+        "update answer_versions set review_status = 'NEEDS_REVIEW' where id = $1 returning id",
+        [answerId]
+      )
+    );
+
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("REVIEWER role은 검토 결정(review_status -> APPROVED)을 반영할 수 있다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("reviewer-a", "REVIEWER");
+    const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
+
+    const result = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query(
+        "update answer_versions set review_status = 'APPROVED' where id = $1 returning id",
+        [answerId]
+      )
+    );
+
+    expect(result.rows).toHaveLength(1);
+  });
+
+  it("다른 조직의 REVIEWER는 review_status를 변경할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const orgB = await seedOrgWithMemberAndProject("reviewer-b", "REVIEWER");
+    const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
+
+    const result = await withScope(db, { userId: orgB.userId, organizationId: orgA.orgId }, (tx) =>
+      tx.query(
+        "update answer_versions set review_status = 'APPROVED' where id = $1 returning id",
+        [answerId]
+      )
+    );
+
+    expect(result.rows).toHaveLength(0);
+  });
+
+  it("review_status 이외의 컬럼(body_markdown)은 여전히 수정할 수 없다", async () => {
+    const orgA = await seedOrgWithMemberAndProject("owner-a", "OWNER");
+    const questionId = await insertQuestionAsOwner(orgA.orgId, orgA.projectId, orgA.userId);
+    const answerId = await insertAnswerVersionAsOwner(questionId, orgA.userId);
+
+    await expect(
+      withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+        tx.query("update answer_versions set body_markdown = '변조' where id = $1", [answerId])
+      )
+    ).rejects.toThrow();
+  });
+});
