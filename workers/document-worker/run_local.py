@@ -19,8 +19,12 @@ status transitions, page/chunk rows, vector column widths -- is exercised
 for real. Run again after each upload; this does not loop or watch for new
 jobs.
 
-Usage: from workers/document-worker/, with the venv activated and env vars
-(DATABASE_URL, OBJECT_STORAGE_*) set: `python run_local.py`
+Usage: from workers/document-worker/, with the venv activated:
+`python run_local.py`
+Reads DATABASE_URL/OBJECT_STORAGE_* from apps/web/.env.local automatically
+(same values `next dev` uses) -- no need to export them in the shell first,
+which was a recurring source of "works in bash, not in PowerShell" friction.
+Already-exported env vars still take precedence over the file.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ import hashlib
 import os
 import struct
 import sys
+from pathlib import Path
 
 import psycopg
 
@@ -36,6 +41,12 @@ from document_worker.malware_scan import ScanResult
 from document_worker.pipeline import process_document
 from document_worker.repository import PostgresDocumentRepository
 from document_worker.storage import S3ObjectStorage
+from env_file import parse_env_file
+
+# apps/web/.env.local, relative to this file -- same values `next dev`
+# loads, so there is only one place to fill these in. Real environment
+# variables (if already exported) always win over this file.
+_ENV_LOCAL_PATH = Path(__file__).resolve().parent.parent.parent / "apps" / "web" / ".env.local"
 
 EMBEDDING_DIMENSIONS = 1536  # matches document_chunks.embedding vector(1536)
 
@@ -111,7 +122,13 @@ def _mark_job(dsn: str, job_id: str, status: str, *, error_code: str | None = No
         conn.commit()
 
 
+def _load_dotenv_defaults() -> None:
+    for key, value in parse_env_file(_ENV_LOCAL_PATH).items():
+        os.environ.setdefault(key, value)
+
+
 def main() -> None:
+    _load_dotenv_defaults()
     dsn = _require_env("DATABASE_URL")
     storage = S3ObjectStorage(
         endpoint_url=_require_env("OBJECT_STORAGE_ENDPOINT"),
