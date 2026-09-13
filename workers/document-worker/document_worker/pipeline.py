@@ -96,7 +96,7 @@ def process_document(
 
     page_ids = repo.insert_pages(document_id, pages)
 
-    repo.update_status(document_id, "INDEXING")
+    repo.update_status(document_id, "INDEXING", page_count=len(pages))
     try:
         for page, page_id in zip(pages, page_ids, strict=True):
             chunks = chunk_text(page.text)

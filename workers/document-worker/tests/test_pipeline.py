@@ -102,6 +102,8 @@ class TestProcessDocumentHappyPath:
         assert len(repo.pages) == 1
         assert len(repo.chunk_calls) == 1
         assert len(embedder.calls) == 1
+        indexing_fields = repo.status_history[2][1]
+        assert indexing_fields["page_count"] == 1
 
 
 class TestProcessDocumentMalware:

@@ -52,7 +52,7 @@ class PostgresDocumentRepository:
     def update_status(self, document_id: str, status: str, **fields: object) -> None:
         set_clauses = ["status = %s", "updated_at = now()"]
         params: list[object] = [status]
-        for key in ("failure_code", "failure_message"):
+        for key in ("failure_code", "failure_message", "page_count"):
             if key in fields:
                 set_clauses.append(f"{key} = %s")
                 params.append(fields[key])
