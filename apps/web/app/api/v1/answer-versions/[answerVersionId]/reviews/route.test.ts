@@ -93,8 +93,8 @@ describe("POST /api/v1/answer-versions/{answerVersionId}/reviews", () => {
     getMembership.mockResolvedValue({ role: "REVIEWER" });
     mockQueries([
       { rows: [answerVersionJoinRow("NEEDS_REVIEW")] },
-      { rows: [{ id: "review-1", decision: "REJECTED", comment: "불일치", created_at: "2026-09-14T00:00:00Z" }] },
       { rows: [{ id: "answer-1", review_status: "REJECTED" }] },
+      { rows: [{ id: "review-1", decision: "REJECTED", comment: "불일치", created_at: "2026-09-14T00:00:00Z" }] },
     ]);
     const { POST } = await import("./route");
 
@@ -107,5 +107,19 @@ describe("POST /api/v1/answer-versions/{answerVersionId}/reviews", () => {
     const body = await response.json();
     expect(body.data.review.decision).toBe("REJECTED");
     expect(body.data.reviewStatus).toBe("REJECTED");
+  });
+
+  it("검토 요청 확인과 실제 갱신 사이에 다른 REVIEWER가 먼저 처리하면 409를 반환한다 (TOCTOU 방지)", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "REVIEWER" });
+    mockQueries([
+      { rows: [answerVersionJoinRow("NEEDS_REVIEW")] },
+      { rows: [] },
+    ]);
+    const { POST } = await import("./route");
+
+    const response = await POST(makeRequest({ decision: "APPROVED" }), ctx);
+
+    expect(response.status).toBe(409);
   });
 });

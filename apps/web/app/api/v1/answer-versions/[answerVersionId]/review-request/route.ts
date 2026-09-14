@@ -43,15 +43,23 @@ export async function POST(_request: Request, { params }: RouteContext) {
     return apiError("CONFLICT", "이미 검토 대기 중이거나 승인된 답변입니다.");
   }
 
+  // review_status를 조건절에 넣어 원자적으로 갱신한다 -- 위의 사전 체크와
+  // 이 UPDATE 사이에 다른 요청(REVIEWER의 승인/반려 등)이 끼어들 수
+  // 있으므로(TOCTOU), affected row 0건이면 그 사이 상태가 바뀐 것으로 보고
+  // 409를 반환한다.
   const updated = await withRequestScope(
     { userId: user.id, organizationId: answerVersion.organization_id },
     (client) =>
       client.query<{ id: string; review_status: string }>(
-        `update answer_versions set review_status = 'NEEDS_REVIEW' where id = $1
+        `update answer_versions set review_status = 'NEEDS_REVIEW'
+         where id = $1 and review_status in ('DRAFT', 'REJECTED')
          returning id, review_status`,
         [answerVersionId]
       )
   );
+  if (updated.rows.length === 0) {
+    return apiError("CONFLICT", "이미 검토 대기 중이거나 승인된 답변입니다.");
+  }
 
   return apiOk({ id: updated.rows[0]!.id, reviewStatus: updated.rows[0]!.review_status });
 }

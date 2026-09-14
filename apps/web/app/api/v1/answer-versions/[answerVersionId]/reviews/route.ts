@@ -60,19 +60,32 @@ export async function POST(request: Request, { params }: RouteContext) {
 
   const scope = { userId: user.id, organizationId: answerVersion.organization_id };
   const result = await withRequestScope(scope, async (client) => {
+    // review_status를 조건절에 넣어 원자적으로 갱신한다 -- 위의
+    // answerVersion.review_status 체크와 이 UPDATE 사이에 다른 REVIEWER의
+    // 요청이 끼어들 수 있으므로(TOCTOU), affected row 0건을 "이미 처리됨"
+    // 신호로 삼아 reviews row 중복 기록을 막는다.
+    const updated = await client.query<{ id: string; review_status: string }>(
+      `update answer_versions set review_status = $1
+       where id = $2 and review_status = 'NEEDS_REVIEW'
+       returning id, review_status`,
+      [decision, answerVersionId]
+    );
+    if (updated.rows.length === 0) {
+      return { kind: "conflict" as const };
+    }
+
     const reviewInsert = await client.query<ReviewRow>(
       `insert into reviews (answer_version_id, reviewer_id, decision, comment)
        values ($1, $2, $3, $4)
        returning id, decision, comment, created_at`,
       [answerVersionId, user.id, decision, comment ?? null]
     );
-    const updated = await client.query<{ id: string; review_status: string }>(
-      `update answer_versions set review_status = $1 where id = $2
-       returning id, review_status`,
-      [decision, answerVersionId]
-    );
-    return { review: reviewInsert.rows[0]!, answerVersion: updated.rows[0]! };
+    return { kind: "created" as const, review: reviewInsert.rows[0]!, answerVersion: updated.rows[0]! };
   });
+
+  if (result.kind === "conflict") {
+    return apiError("CONFLICT", "검토 대기 중인 답변이 아닙니다.");
+  }
 
   return apiOk(
     {

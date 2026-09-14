@@ -99,4 +99,15 @@ describe("POST /api/v1/answer-versions/{answerVersionId}/review-request", () => 
     const body = await response.json();
     expect(body.data.reviewStatus).toBe("NEEDS_REVIEW");
   });
+
+  it("사전 확인과 실제 갱신 사이에 상태가 바뀌면 409를 반환한다 (TOCTOU 방지)", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    mockQueries([{ rows: [answerVersionJoinRow("DRAFT")] }, { rows: [] }]);
+    const { POST } = await import("./route");
+
+    const response = await POST(makeRequest(), ctx);
+
+    expect(response.status).toBe(409);
+  });
 });

@@ -122,6 +122,21 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
   const { assignedTo, priority } = parsed.data;
 
+  const scope = { userId: user.id, organizationId: question.organization_id };
+
+  if (assignedTo) {
+    const assigneeMembership = await withRequestScope(scope, (client) =>
+      client.query<{ user_id: string }>(
+        `select user_id from organization_members
+         where organization_id = $1 and user_id = $2 and status = 'ACTIVE'`,
+        [question.organization_id, assignedTo]
+      )
+    );
+    if (assigneeMembership.rows.length === 0) {
+      return apiError("VALIDATION_ERROR", "담당자는 해당 조직의 활성 멤버여야 합니다.");
+    }
+  }
+
   const sets: string[] = [];
   const values: unknown[] = [];
   if (assignedTo !== undefined) {
@@ -134,15 +149,13 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
   values.push(questionId);
 
-  const updated = await withRequestScope(
-    { userId: user.id, organizationId: question.organization_id },
-    (client) =>
-      client.query<QuestionRow>(
-        `update questions set ${sets.join(", ")}, updated_at = now()
-         where id = $${values.length}
-         returning ${QUESTION_COLUMNS}`,
-        values
-      )
+  const updated = await withRequestScope(scope, (client) =>
+    client.query<QuestionRow>(
+      `update questions set ${sets.join(", ")}, updated_at = now()
+       where id = $${values.length}
+       returning ${QUESTION_COLUMNS}`,
+      values
+    )
   );
 
   return apiOk(toQuestionDto(updated.rows[0]!));

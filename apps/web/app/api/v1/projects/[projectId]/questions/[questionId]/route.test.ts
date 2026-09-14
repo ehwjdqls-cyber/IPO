@@ -205,6 +205,31 @@ describe("PATCH /api/v1/projects/{projectId}/questions/{questionId}", () => {
     expect(response.status).toBe(404);
   });
 
+  it("assignedTo가 조직의 활성 멤버가 아니면 422를 반환한다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    mockQueries([{ rows: [questionRow] }, { rows: [] }]);
+    const { PATCH } = await import("./route");
+
+    const response = await PATCH(
+      makeRequest({ assignedTo: "4d78a53d-66f4-4b44-b768-d66eb6ed957e" }),
+      ctx
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it("assignedTo를 null로 보내 담당자를 해제할 때는 멤버십을 확인하지 않는다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    mockQueries([{ rows: [questionRow] }, { rows: [{ ...questionRow, assigned_to: null }] }]);
+    const { PATCH } = await import("./route");
+
+    const response = await PATCH(makeRequest({ assignedTo: null }), ctx);
+
+    expect(response.status).toBe(200);
+  });
+
   it("EDITOR 이상은 priority/assignedTo를 수정할 수 있다", async () => {
     getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
     getMembership.mockResolvedValue({ role: "EDITOR" });
@@ -216,5 +241,23 @@ describe("PATCH /api/v1/projects/{projectId}/questions/{questionId}", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.priority).toBe("CRITICAL");
+  });
+
+  it("assignedTo가 조직의 활성 멤버이면 지정할 수 있다", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    const assigneeId = "4d78a53d-66f4-4b44-b768-d66eb6ed957e";
+    mockQueries([
+      { rows: [questionRow] },
+      { rows: [{ user_id: assigneeId }] },
+      { rows: [{ ...questionRow, assigned_to: assigneeId }] },
+    ]);
+    const { PATCH } = await import("./route");
+
+    const response = await PATCH(makeRequest({ assignedTo: assigneeId }), ctx);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.assignedTo).toBe(assigneeId);
   });
 });

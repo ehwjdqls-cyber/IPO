@@ -94,8 +94,14 @@ export async function POST(request: Request, { params }: RouteContext) {
       citationIds.length === 0
         ? { rows: [] as CitationRow[] }
         : await client.query<CitationRow>(
-            `select ${CITATION_COLUMNS} from citations where id = any($1::uuid[])`,
-            [citationIds]
+            `select ${CITATION_COLUMNS} from citations c
+             where c.id = any($1::uuid[])
+               and exists (
+                 select 1 from claims cl
+                 join answer_versions av on av.id = cl.answer_version_id
+                 where cl.id = c.claim_id and av.question_id = $2
+               )`,
+            [citationIds, questionId]
           );
     const citationById = new Map(existingCitations.rows.map((c) => [c.id, c]));
     for (const id of citationIds) {
