@@ -1,61 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { listQuestionsQuerySchema } from "@ipo/contracts";
+import { can, listQuestionsQuerySchema } from "@ipo/contracts";
 import { getAuthenticatedUser } from "../../../../../lib/auth";
 import { findProjectById } from "../../../../../lib/queries/projects";
 import { getMembership } from "../../../../../lib/membership";
 import { listQuestionsWithKpi } from "../../../../../lib/queries/questions";
-import { Badge } from "../../../../../components/ui/badge";
+import { listActiveOrgMembers } from "../../../../../lib/queries/organizations";
 import { Button } from "../../../../../components/ui/button";
 import { Card } from "../../../../../components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../../../../components/ui/table";
 import { QuestionsFilterToolbar } from "./questions-filter-toolbar";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  BUSINESS: "사업모델·성장성",
-  FINANCE: "재무·수익성",
-  CUSTOMER: "고객·거래처",
-  GOVERNANCE: "지배구조",
-  INTERNAL_CONTROL: "내부통제",
-  RISK: "주요 위험",
-};
-
-const PRIORITY_LABEL: Record<string, string> = {
-  CRITICAL: "긴급",
-  HIGH: "높음",
-  MEDIUM: "보통",
-  LOW: "낮음",
-};
-
-const EVIDENCE_STATUS_LABEL: Record<string, string> = {
-  UNANSWERED: "미작성",
-  SUPPORTED: "지원됨",
-  PARTIAL: "일부 지원",
-  NEEDS_EVIDENCE: "근거 부족",
-  CONFLICT: "충돌",
-};
-
-const EVIDENCE_STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  UNANSWERED: "outline",
-  SUPPORTED: "default",
-  PARTIAL: "secondary",
-  NEEDS_EVIDENCE: "secondary",
-  CONFLICT: "destructive",
-};
-
-const REVIEW_STATUS_LABEL: Record<string, string> = {
-  DRAFT: "초안",
-  NEEDS_REVIEW: "검토 대기",
-  APPROVED: "승인",
-  REJECTED: "반려",
-};
+import { QuestionsTable } from "./questions-table";
 
 export default async function QuestionsPage({
   params,
@@ -90,12 +44,17 @@ export default async function QuestionsPage({
   const parsedFilters = listQuestionsQuerySchema.safeParse(flatParams);
   const filters = parsedFilters.success ? parsedFilters.data : {};
 
+  const canManage = can(membership.role, "job.manage");
+
   const { kpi, questions } = await listQuestionsWithKpi(
     user.id,
     project.organizationId,
     projectId,
     filters
   );
+  const orgMembers = canManage
+    ? await listActiveOrgMembers(user.id, project.organizationId)
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -141,53 +100,12 @@ export default async function QuestionsPage({
           </p>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">번호</TableHead>
-                <TableHead>질문</TableHead>
-                <TableHead>카테고리</TableHead>
-                <TableHead>중요도</TableHead>
-                <TableHead>근거상태</TableHead>
-                <TableHead>담당자</TableHead>
-                <TableHead>검토상태</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.map((question, index) => (
-                <TableRow key={question.id}>
-                  <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell className="max-w-md font-medium text-foreground">
-                    <Link
-                      href={`/projects/${projectId}/questions/${question.id}`}
-                      className="hover:underline"
-                    >
-                      {question.questionText}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {CATEGORY_LABEL[question.category] ?? question.category}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {PRIORITY_LABEL[question.priority] ?? question.priority}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={EVIDENCE_STATUS_VARIANT[question.evidenceStatus] ?? "outline"}>
-                      {EVIDENCE_STATUS_LABEL[question.evidenceStatus] ?? question.evidenceStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {question.assigneeDisplayName ?? "-"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {question.reviewStatus ? REVIEW_STATUS_LABEL[question.reviewStatus] ?? question.reviewStatus : "-"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <QuestionsTable
+          projectId={projectId}
+          questions={questions}
+          canManage={canManage}
+          orgMembers={orgMembers}
+        />
       )}
     </div>
   );

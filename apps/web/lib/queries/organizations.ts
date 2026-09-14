@@ -23,3 +23,27 @@ export async function listMemberships(userId: string): Promise<OrganizationMembe
   );
   return result.rows.map((r) => ({ id: r.organization_id, name: r.organization_name, role: r.role }));
 }
+
+export interface OrgMember {
+  userId: string;
+  displayName: string;
+  role: MemberRole;
+}
+
+/** S10 대량행동(담당자 지정)의 담당자 선택 목록용. */
+export async function listActiveOrgMembers(
+  userId: string,
+  organizationId: string
+): Promise<OrgMember[]> {
+  const result = await withRequestScope({ userId, organizationId }, (client) =>
+    client.query<{ user_id: string; display_name: string; role: MemberRole }>(
+      `select m.user_id, p.display_name, m.role
+       from organization_members m
+       join profiles p on p.id = m.user_id
+       where m.organization_id = $1 and m.status = 'ACTIVE'
+       order by p.display_name asc`,
+      [organizationId]
+    )
+  );
+  return result.rows.map((r) => ({ userId: r.user_id, displayName: r.display_name, role: r.role }));
+}
