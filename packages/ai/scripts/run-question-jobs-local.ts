@@ -80,7 +80,14 @@ export function mockGenerateQuestions(params: {
     const chunk = params.chunks[i % params.chunks.length]!;
     questions.push({
       category,
-      question: `[모의생성] ${chunk.content.slice(0, 40) || "본문"}에 대한 ${category} 관련 확인 질문입니다.`,
+      // "※"는 순수 기호라 to_tsvector가 lexeme을 만들지 않는다(직접 확인함) --
+      // 나머지는 문서에 없는 단어를 추가하면 안 된다: run-answer-jobs-local.ts가
+      // 이 question_text 전체를 그대로 plainto_tsquery에 넘기는데, 그건 모든
+      // 단어를 AND로 묶으므로 "관련"/"확인"/"질문입니다"/카테고리명처럼 문서에
+      // 없는 단어가 하나라도 섞이면 실제로 인용한 청크조차 매칭에 실패한다.
+      // questionGenerationOutputSchema가 question.min(10)을 요구하므로, 청크가
+      // 아주 짧을 때(테스트 픽스처 등)도 lexeme 없는 "※"로 패딩해 길이를 채운다.
+      question: `※ ${chunk.content.slice(0, 60).trim() || "본문"}`.padEnd(10, "※"),
       rationale: `문서 ${chunk.documentId}의 ${chunk.pageNumber}페이지 내용을 바탕으로 한 모의 생성 근거입니다.`,
       priority: "MEDIUM",
       evidenceChunkIds: [chunk.chunkId],
