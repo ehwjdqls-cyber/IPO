@@ -191,6 +191,79 @@ describe("hybridSearch", () => {
     expect(results.map((r) => r.chunkId)).not.toContain(otherOrgChunkId);
   });
 
+  it("documentIds에 다른 조직의 문서 id를 억지로 넣어도 결과에 포함되지 않는다 (adversarial input, spec 32절)", async () => {
+    const orgA = await seedOrgProjectDocument("owner-f");
+    const orgB = await seedOrgProjectDocument("owner-g");
+    await insertChunk(
+      orgA.orgId,
+      orgA.projectId,
+      orgA.documentId,
+      orgA.pageId,
+      0,
+      "조직 A 문서 내용",
+      makeEmbedding(1)
+    );
+    const otherOrgChunkId = await insertChunk(
+      orgB.orgId,
+      orgB.projectId,
+      orgB.documentId,
+      orgB.pageId,
+      0,
+      "조직 B 문서 내용",
+      makeEmbedding(1)
+    );
+
+    // 공격 시나리오: 호출자가 자신의 organizationId/projectId로 스코프를
+    // 잡았지만, documentIds 배열에는 (버그나 조작으로) 다른 조직의 문서
+    // id를 섞어 보낸다. organization_id/project_id WHERE 조건이 documentIds
+    // 필터보다 우선해야 한다 -- "AND" 조건이므로 다른 조직 문서는 어차피
+    // organization_id 불일치로 걸러지지만, 이 테스트는 그 전제가 실제로
+    // 지켜지는지 회귀적으로 고정한다.
+    const results = await withScope(db, { userId: orgA.userId, organizationId: orgA.orgId }, (tx) =>
+      hybridSearch(tx, {
+        organizationId: orgA.orgId,
+        projectId: orgA.projectId,
+        queryEmbedding: makeEmbedding(1),
+        queryText: "문서 내용",
+        documentIds: [orgA.documentId, orgB.documentId],
+      })
+    );
+
+    expect(results.map((r) => r.chunkId)).not.toContain(otherOrgChunkId);
+  });
+
+  it("호출자의 세션 GUC를 다른 조직으로 조작해도 RLS가 그 조직의 청크를 차단한다 (defense-in-depth)", async () => {
+    const orgA = await seedOrgProjectDocument("owner-h");
+    const orgB = await seedOrgProjectDocument("owner-i");
+    const orgBChunkId = await insertChunk(
+      orgB.orgId,
+      orgB.projectId,
+      orgB.documentId,
+      orgB.pageId,
+      0,
+      "조직 B 전용 내용",
+      makeEmbedding(1)
+    );
+
+    // orgA의 세션(app.current_user_id = orgA.userId)인 채로 organizationId
+    // GUC만 orgB로 바꿔치기하는 시나리오 -- hybridSearch 자체의 WHERE 조건은
+    // 호출자가 넘긴 organizationId를 그대로 신뢰하므로 여기서는 orgB의
+    // 청크가 "조회 대상"이 되지만, is_active_member(orgB, orgA.userId)가
+    // false이므로 document_chunks의 RLS select policy가 최종적으로 막아야
+        // 한다.
+    const results = await withScope(db, { userId: orgA.userId, organizationId: orgB.orgId }, (tx) =>
+      hybridSearch(tx, {
+        organizationId: orgB.orgId,
+        projectId: orgB.projectId,
+        queryEmbedding: makeEmbedding(1),
+        queryText: "내용",
+      })
+    );
+
+    expect(results.map((r) => r.chunkId)).not.toContain(orgBChunkId);
+    expect(results).toHaveLength(0);
+  });
+
   it("limit을 넘는 결과는 잘라낸다", async () => {
     const org = await seedOrgProjectDocument("owner-e");
     for (let i = 0; i < 5; i++) {
