@@ -56,6 +56,15 @@ const LATEST_ANSWERS_CTE = `
   )
 `;
 
+/** QUESTION_COLUMNS is unqualified ("id, organization_id, ...") -- fine for
+ * a plain `select ... from questions`, but the list query below joins
+ * latest_answers (also has an `id` column), so the bare `id` becomes
+ * ambiguous to Postgres. Qualify every column with the `q` alias instead
+ * of hand-duplicating the column list. */
+const QUALIFIED_QUESTION_COLUMNS = QUESTION_COLUMNS.split(", ")
+  .map((column) => `q.${column}`)
+  .join(", ");
+
 /** Same read path as GET /api/v1/projects/{projectId}/questions -- kept
  * here so the S10 Server Component page can call it directly. */
 export async function listQuestionsWithKpi(
@@ -114,7 +123,7 @@ export async function listQuestionsWithKpi(
 
     const list = await client.query<ListRow>(
       `${LATEST_ANSWERS_CTE}
-       select ${QUESTION_COLUMNS}, la.id as answer_version_id, la.evidence_status, la.review_status,
+       select ${QUALIFIED_QUESTION_COLUMNS}, la.id as answer_version_id, la.evidence_status, la.review_status,
               p.display_name as assignee_display_name
        from questions q
        left join latest_answers la on la.question_id = q.id

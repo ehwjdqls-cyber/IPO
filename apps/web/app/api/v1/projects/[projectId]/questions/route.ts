@@ -32,6 +32,15 @@ const LATEST_ANSWERS_CTE = `
   )
 `;
 
+/** QUESTION_COLUMNS is unqualified ("id, organization_id, ...") -- fine for
+ * a plain `select ... from questions`, but this list query joins
+ * latest_answers (also has an `id` column), so the bare `id` becomes
+ * ambiguous to Postgres. Qualify every column with the `q` alias instead
+ * of hand-duplicating the column list. */
+const QUALIFIED_QUESTION_COLUMNS = QUESTION_COLUMNS.split(", ")
+  .map((column) => `q.${column}`)
+  .join(", ");
+
 export async function GET(request: Request, { params }: RouteContext) {
   const user = await getAuthenticatedUser();
   if (!user) {
@@ -107,7 +116,7 @@ export async function GET(request: Request, { params }: RouteContext) {
 
       const list = await client.query<ListRow>(
         `${LATEST_ANSWERS_CTE}
-         select ${QUESTION_COLUMNS}, la.id as answer_version_id, la.evidence_status, la.review_status
+         select ${QUALIFIED_QUESTION_COLUMNS}, la.id as answer_version_id, la.evidence_status, la.review_status
          from questions q
          left join latest_answers la on la.question_id = q.id
          where ${conditions.join(" and ")}
