@@ -49,3 +49,5 @@ next-env.d.ts
 
 # claude code (personal, per-machine permission overrides)
 .claude/settings.local.json
+
+.vercel
