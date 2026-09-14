@@ -187,4 +187,41 @@ describe("POST /api/v1/projects/{projectId}/questions/{questionId}/answer-versio
     expect(body.data.answerVersion.claims).toHaveLength(1);
     expect(body.data.answerVersion.claims[0].citations[0].chunkId).toBe("chunk-1");
   });
+
+  it("claims가 비어있는 답변도 저장할 수 있다 (근거를 전혀 찾지 못한 경우, evidenceStatus는 NEEDS_EVIDENCE)", async () => {
+    getAuthenticatedUser.mockResolvedValue({ id: "user-1" });
+    getMembership.mockResolvedValue({ role: "EDITOR" });
+    const newAnswerVersionRow = {
+      id: "answer-2",
+      question_id: "question-1",
+      version: 1,
+      body_markdown: "근거를 찾지 못했습니다.",
+      source: "USER",
+      evidence_status: "NEEDS_EVIDENCE",
+      review_status: "DRAFT",
+      model_snapshot: null,
+      prompt_version: null,
+      retrieval_set_hash: null,
+      created_by: "user-1",
+      created_at: "2026-09-14T00:00:00Z",
+    };
+    const query = mockQueries([
+      { rows: [questionRow] },
+      { rows: [{ max: "0" }] },
+      { rows: [newAnswerVersionRow] },
+    ]);
+    const { POST } = await import("./route");
+
+    const response = await POST(
+      makeRequest({ baseVersion: 0, bodyMarkdown: "근거를 찾지 못했습니다.", claims: [] }),
+      ctx
+    );
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.data.answerVersion.claims).toHaveLength(0);
+    expect(body.data.answerVersion.evidenceStatus).toBe("NEEDS_EVIDENCE");
+    const answerVersionInsertCall = query.mock.calls[2]!;
+    expect(answerVersionInsertCall[1]).toContain("NEEDS_EVIDENCE");
+  });
 });

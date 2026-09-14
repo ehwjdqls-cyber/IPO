@@ -115,7 +115,11 @@ export async function POST(request: Request, { params }: RouteContext) {
       const sourceCitations = claimInput.citationIds.map((id) => citationById.get(id)!);
       return { claimInput, sourceCitations, evidenceStatus: deriveClaimEvidenceStatus(claimInput, sourceCitations) };
     });
-    const finalEvidenceStatus = worstStatus(claimPlans.map((p) => p.evidenceStatus));
+    // claims가 비어있으면(근거를 전혀 찾지 못한 답변) worstStatus([])의 기본값인
+    // SUPPORTED는 잘못된 신호다 -- 검증된 것이 아무것도 없다는 뜻이므로
+    // NEEDS_EVIDENCE로 처리한다.
+    const finalEvidenceStatus =
+      claimPlans.length === 0 ? "NEEDS_EVIDENCE" : worstStatus(claimPlans.map((p) => p.evidenceStatus));
     const claimResults: Array<{ claim: ClaimRow; citations: CitationRow[] }> = [];
 
     const answerVersionInsert = await client.query<AnswerVersionRow>(

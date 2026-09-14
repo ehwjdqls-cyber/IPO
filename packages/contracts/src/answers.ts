@@ -41,10 +41,13 @@ export const answerVersionClaimInputSchema = z
   });
 export type AnswerVersionClaimInput = z.infer<typeof answerVersionClaimInputSchema>;
 
+/** claims can be empty -- a legitimate case when no evidence was found at
+ * all for the question (the AI/mock answer itself may have zero claims),
+ * not just "user hasn't filled anything in yet". */
 export const createAnswerVersionRequestSchema = z.object({
   baseVersion: z.number().int().min(0),
   bodyMarkdown: z.string().trim().min(1),
-  claims: z.array(answerVersionClaimInputSchema).min(1),
+  claims: z.array(answerVersionClaimInputSchema),
 });
 export type CreateAnswerVersionRequest = z.infer<typeof createAnswerVersionRequestSchema>;
 

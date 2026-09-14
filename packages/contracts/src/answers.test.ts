@@ -61,13 +61,13 @@ describe("createAnswerVersionRequestSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("claims가 비어있으면 거부한다", () => {
+  it("claims가 비어있어도 통과한다 (근거를 전혀 찾지 못한 답변)", () => {
     const result = createAnswerVersionRequestSchema.safeParse({
       baseVersion: 1,
       bodyMarkdown: "본문",
       claims: [],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("citation 없는 사실 claim은 거부한다", () => {
