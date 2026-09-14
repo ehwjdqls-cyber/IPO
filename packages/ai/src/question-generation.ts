@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { PRIORITY_LEVELS, QUESTION_CATEGORIES } from "@ipo/contracts";
+import { supportsTemperature } from "./model-capabilities";
+import { extractResponseOutputText } from "./responses-api";
 
 /**
  * spec 24절 "예상 질문 생성 프롬프트". Uses the OpenAI Responses API
@@ -152,7 +154,9 @@ export async function generateQuestions(
     },
     body: JSON.stringify({
       model: params.model,
-      temperature: 0.3, // spec 22절: 질문 생성 기본 temperature
+      // spec 22절: 질문 생성 기본 temperature 0.3 -- 단 reasoning 모델(gpt-5
+      // 계열 등)은 이 파라미터 자체를 거부하므로 지원하는 모델에만 보낸다.
+      ...(supportsTemperature(params.model) ? { temperature: 0.3 } : {}),
       input: [
         { role: "system", content: buildSystemPrompt() },
         { role: "developer", content: buildDeveloperPrompt(params) },
@@ -175,7 +179,7 @@ export async function generateQuestions(
   }
 
   const body = await response.json();
-  const text: unknown = body?.output?.[0]?.content?.[0]?.text;
+  const text = extractResponseOutputText(body);
   if (typeof text !== "string") {
     throw new Error("question generation response missing output text");
   }

@@ -302,6 +302,45 @@ describe("generateAnswer", () => {
     expect(body.text.format.strict).toBe(true);
   });
 
+  it("reasoning 모델(gpt-5 계열)에는 temperature를 보내지 않는다 (400 Unsupported parameter 방지)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify({
+                  answerMarkdown: "답변",
+                  evidenceStatus: "NEEDS_EVIDENCE",
+                  claims: [],
+                  dataGaps: [],
+                  conflicts: [],
+                  followUpQuestions: [],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateAnswer({
+      apiKey: "test-key",
+      model: "gpt-5-nano",
+      questionText: "질문",
+      category: "FINANCE",
+      chunks,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.model).toBe("gpt-5-nano");
+    expect(body).not.toHaveProperty("temperature");
+  });
+
   it("모델이 스키마를 위반한 JSON을 반환하면 거부한다", async () => {
     vi.stubGlobal(
       "fetch",

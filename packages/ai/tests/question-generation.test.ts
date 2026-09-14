@@ -164,6 +164,27 @@ describe("generateQuestions", () => {
     expect(body.input[2].role).toBe("user");
   });
 
+  it("reasoning 모델(gpt-5 계열)에는 temperature를 보내지 않는다 (400 Unsupported parameter 방지)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify({ questions: [] }) }],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateQuestions({ ...baseParams, model: "gpt-5-nano" });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    expect(body.model).toBe("gpt-5-nano");
+    expect(body).not.toHaveProperty("temperature");
+  });
+
   it("성공 응답에서 questions 배열을 파싱해 반환한다", async () => {
     const question = {
       category: "FINANCE",
