@@ -10,12 +10,11 @@
  * Postgres this machine is configured for, then exits. Run again after
  * each "생성" click.
  *
- * mockGenerateQuestions() is a dev-only stand-in for the real
- * generateQuestions() in src/question-generation.ts -- deterministic,
- * costs nothing, but the questions it produces are NOT semantically
- * meaningful (no real LLM reasoning). Only exercises the pipeline's
- * shape (job -> chunks -> questions rows) end-to-end. The real
- * generateQuestions() is untouched and still what production will call.
+ * Calls the real generateQuestions() (src/question-generation.ts) by
+ * default -- an actual OpenAI request, actual cost. mockGenerateQuestions()
+ * remains as a free, deterministic fallback for offline development or
+ * exercising the pipeline's shape without an API key: pass --mock to use
+ * it instead.
  *
  * Writes directly via the same superuser DATABASE_URL connection
  * migrate-cli.ts uses (bypasses RLS by table ownership, same as the
@@ -26,8 +25,10 @@
  * is pinned to that job's own created_by, not re-derived here.
  *
  * Usage: from packages/ai/, with the workspace installed:
- * `npx tsx scripts/run-question-jobs-local.ts`
- * Reads DATABASE_URL from apps/web/.env.local automatically.
+ * `npx tsx scripts/run-question-jobs-local.ts` (real API, needs AI_API_KEY)
+ * `npx tsx scripts/run-question-jobs-local.ts --mock` (free, deterministic)
+ * Reads DATABASE_URL/AI_API_KEY/AI_GENERATION_MODEL_SNAPSHOT from
+ * apps/web/.env.local automatically.
  */
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -35,6 +36,7 @@ import pg from "pg";
 import { QUESTION_CATEGORIES, type QuestionCategory } from "@ipo/contracts";
 import { parseEnvFile } from "./env-file";
 import {
+  generateQuestions,
   questionGenerationOutputSchema,
   type GeneratedQuestion,
   type RetrievedChunkForPrompt,
@@ -120,6 +122,22 @@ interface QueuedJob {
   projectId: string;
   createdBy: string;
   input: { documentIds: string[]; categories: string[]; questionCount: number; depth: string };
+}
+
+interface ProjectInfo {
+  targetMarket: string;
+  industry: string;
+}
+
+async function fetchProjectInfo(client: pg.Client, projectId: string): Promise<ProjectInfo> {
+  const result = await client.query<{ target_market: string; industry: string }>(
+    "select target_market, industry from projects where id = $1",
+    [projectId]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`project not found: ${projectId}`);
+  }
+  return { targetMarket: result.rows[0]!.target_market, industry: result.rows[0]!.industry };
 }
 
 async function fetchQueuedJobs(client: pg.Client): Promise<QueuedJob[]> {
@@ -214,7 +232,10 @@ async function markJob(
 
 async function main(): Promise<void> {
   loadDotenvDefaults();
+  const useMock = process.argv.includes("--mock");
   const dsn = requireEnv("DATABASE_URL");
+  const apiKey = useMock ? null : requireEnv("AI_API_KEY");
+  const model = useMock ? null : requireEnv("AI_GENERATION_MODEL_SNAPSHOT");
   const client = new pg.Client({ connectionString: dsn });
   await client.connect();
 
@@ -229,11 +250,26 @@ async function main(): Promise<void> {
       console.log(`Processing job ${job.id} (project ${job.projectId})...`);
       try {
         const chunks = await fetchChunks(client, job.input.documentIds);
-        const generated = mockGenerateQuestions({
-          categories: job.input.categories,
-          questionCount: job.input.questionCount,
-          chunks,
-        });
+        let generated: GeneratedQuestion[];
+        if (useMock) {
+          generated = mockGenerateQuestions({
+            categories: job.input.categories,
+            questionCount: job.input.questionCount,
+            chunks,
+          });
+        } else {
+          const project = await fetchProjectInfo(client, job.projectId);
+          generated = await generateQuestions({
+            apiKey: apiKey!,
+            model: model!,
+            targetMarket: project.targetMarket,
+            industry: project.industry,
+            questionCount: job.input.questionCount,
+            categories: job.input.categories,
+            depth: job.input.depth,
+            chunks,
+          });
+        }
         const validated = questionGenerationOutputSchema.parse({ questions: generated });
         await insertQuestions(client, job, validated.questions);
         await markJob(client, job.id, "SUCCEEDED");

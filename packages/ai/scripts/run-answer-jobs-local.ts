@@ -5,31 +5,38 @@
  * too. Drains every QUEUED ANSWER_GENERATE job once, then exits.
  *
  * Uses the real hybridSearch() (spec 23절) for retrieval -- dense search
- * needs a real query embedding this session doesn't have, so it's
- * disabled here (denseTopK: 0) and only the sparse (Postgres full-text)
- * side runs. That's still genuine retrieval over the real extracted
- * document text, not a mock -- only the embedding-based half is skipped.
+ * needs a real query embedding, and existing document chunks were
+ * embedded with a local hash-based mock embedder (no real semantic
+ * vectors), so dense search is disabled here (denseTopK: 0) and only the
+ * sparse (Postgres full-text) side runs regardless of --mock. That's
+ * still genuine retrieval over the real extracted document text, not a
+ * mock -- only the embedding-based half is skipped, and only because the
+ * underlying chunk embeddings aren't real yet (a separate, not-yet-done
+ * re-embedding step, out of scope for this script).
  *
- * mockGenerateAnswer() is the dev-only stand-in for the real
- * generateAnswer() in src/answer-generation.ts: it builds claims/citations
- * directly from the (real) retrieved chunk content, so validateAnswerOutput
- * (spec 26절) has genuine substrings to check against -- exercises the
- * full validation path for real, just without an actual LLM writing the
- * prose. The real generateAnswer() is untouched.
+ * Calls the real generateAnswer() (src/answer-generation.ts) by default --
+ * an actual OpenAI request, actual cost, its own prose. mockGenerateAnswer()
+ * remains as a free, deterministic fallback that builds claims/citations
+ * directly from the (real) retrieved chunk content: pass --mock to use it
+ * instead of the real API.
  *
  * Writes directly via the same superuser DATABASE_URL connection
  * migrate-cli.ts uses, same reasoning as run-question-jobs-local.ts.
  *
  * Usage: from packages/ai/, with the workspace installed:
- * `npx tsx scripts/run-answer-jobs-local.ts`
- * Reads DATABASE_URL from apps/web/.env.local automatically.
+ * `npx tsx scripts/run-answer-jobs-local.ts` (real API, needs AI_API_KEY)
+ * `npx tsx scripts/run-answer-jobs-local.ts --mock` (free, deterministic)
+ * Reads DATABASE_URL/AI_API_KEY/AI_GENERATION_MODEL_SNAPSHOT from
+ * apps/web/.env.local automatically.
  */
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { parseEnvFile } from "./env-file";
 import {
+  ANSWER_GENERATION_PROMPT_ID,
   answerGenerationOutputSchema,
+  generateAnswer,
   validateAnswerOutput,
   type AnswerGenerationOutput,
 } from "../src/answer-generation";
@@ -151,19 +158,22 @@ async function insertAnswer(
   client: pg.Client,
   job: QueuedAnswerJob,
   validated: AnswerGenerationOutput,
-  candidatesById: Map<string, RetrievalCandidate>
+  candidatesById: Map<string, RetrievalCandidate>,
+  modelSnapshot: string
 ): Promise<string> {
   const version = await nextAnswerVersion(client, job.input.questionId);
   const answerVersion = await client.query<{ id: string }>(
     `insert into answer_versions
        (question_id, version, body_markdown, source, evidence_status, model_snapshot, prompt_version, created_by)
-     values ($1, $2, $3, 'AI', $4, 'mock-local', 'grounded-answer-ko-v1.0.0', $5)
+     values ($1, $2, $3, 'AI', $4, $5, $6, $7)
      returning id`,
     [
       job.input.questionId,
       version,
       validated.answerMarkdown,
       validated.evidenceStatus,
+      modelSnapshot,
+      ANSWER_GENERATION_PROMPT_ID,
       job.createdBy,
     ]
   );
@@ -217,7 +227,10 @@ async function markJob(
 
 async function main(): Promise<void> {
   loadDotenvDefaults();
+  const useMock = process.argv.includes("--mock");
   const dsn = requireEnv("DATABASE_URL");
+  const apiKey = useMock ? null : requireEnv("AI_API_KEY");
+  const model = useMock ? null : requireEnv("AI_GENERATION_MODEL_SNAPSHOT");
   const client = new pg.Client({ connectionString: dsn });
   await client.connect();
 
@@ -242,11 +255,24 @@ async function main(): Promise<void> {
         });
         const candidatesById = new Map(candidates.map((c) => [c.chunkId, c]));
 
-        const generated = mockGenerateAnswer(questionText, candidates, job.input.maxClaims);
-        const parsed = answerGenerationOutputSchema.parse(generated);
+        let parsed: AnswerGenerationOutput;
+        const modelSnapshot = useMock ? "mock-local" : model!;
+        if (useMock) {
+          const generated = mockGenerateAnswer(questionText, candidates, job.input.maxClaims);
+          parsed = answerGenerationOutputSchema.parse(generated);
+        } else {
+          const generated = await generateAnswer({
+            apiKey: apiKey!,
+            model: model!,
+            questionText,
+            category: job.input.category,
+            chunks: candidates.slice(0, job.input.maxClaims),
+          });
+          parsed = generated;
+        }
         const validated = validateAnswerOutput(parsed, candidates);
 
-        const answerVersionId = await insertAnswer(client, job, validated, candidatesById);
+        const answerVersionId = await insertAnswer(client, job, validated, candidatesById, modelSnapshot);
         await markJob(client, job.id, "SUCCEEDED", { answerVersionId });
         console.log(`  -> SUCCEEDED (answerVersionId ${answerVersionId}, ${validated.evidenceStatus})`);
       } catch (error) {
